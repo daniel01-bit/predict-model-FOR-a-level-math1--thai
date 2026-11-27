@@ -306,6 +306,36 @@ def test_special_math_and_logic_symbols_preserved_end_to_end():
     assert r"\neq" in html_out and r"\neg" in html_out and r"\forall" in html_out and r"\leftrightarrow" in html_out
 
 
+def test_quota_gauge_auto_resets_when_reset_window_expires():
+    import time
+    from src import llm_router
+
+    key = "gemini:gemini-4-hydrogen"
+    with llm_router._QUOTA_LOCK:
+        llm_router._load_quota_state_unlocked()
+        prev = llm_router._QUOTA_STATE.get(key)
+        llm_router._QUOTA_STATE[key] = {
+            "rpd_used": 20,
+            "rpd_limit": 20,
+            "exhausted_kind": "rpd",
+            "reset_at": time.time() - 5.0,  # already expired 5s ago
+        }
+    try:
+        st = llm_router.get_quota_status("gemini", "gemini-4-hydrogen")
+        assert st["status"] == "ok"
+        assert st["rpd_used"] == 0
+        assert st["rpd_remaining"] == 20
+        assert st["pct"] == 100
+        assert st["reset_in_seconds"] == 0
+    finally:
+        with llm_router._QUOTA_LOCK:
+            if prev is None:
+                llm_router._QUOTA_STATE.pop(key, None)
+            else:
+                llm_router._QUOTA_STATE[key] = prev
+            llm_router._save_quota_state_unlocked()
+
+
 def test_llm_router_circuit_breaker_and_provider_guards():
     from src.llm_router import _is_daily_quota_exhausted, _parse_retry_after_seconds
 
@@ -318,6 +348,15 @@ def test_llm_router_circuit_breaker_and_provider_guards():
     assert _parse_retry_after_seconds("Please retry in 22.5s.") == 23.5
     assert _parse_retry_after_seconds("{'retryDelay': '18s'}") == 19.0
     assert _parse_retry_after_seconds("Please retry in 2h40m58.6s.") is None
+
+    from src.pdf_renderer import _auto_wrap_bare_latex
+
+    wrapped_eq = _auto_wrap_bare_latex(
+        r"วงรีมีสมการ \frac{(x - 4)^2}{169} + \frac{(y + 1)^2}{144} = 1 จุดใดๆ"
+    )
+    assert wrapped_eq == r"วงรีมีสมการ $\frac{(x - 4)^2}{169} + \frac{(y + 1)^2}{144} = 1$ จุดใดๆ"
+    assert _auto_wrap_bare_latex(r"\infty", is_choice=True) == r"$\infty$"
+    assert _auto_wrap_bare_latex(r"ค่าของ $x = \frac{1}{2}$ คือ \infty") == r"ค่าของ $x = \frac{1}{2}$ คือ $\infty$"
     assert _is_daily_quota_exhausted("GenerateRequestsPerDayPerProjectPerModel-FreeTier") is True
     assert _is_daily_quota_exhausted("Generate content requests per day limit exceeded on Free Tier. Please retry in 2h40m58s.") is True
     assert _is_daily_quota_exhausted("GenerateRequestsPerMinutePerProjectPerModel-FreeTier") is False

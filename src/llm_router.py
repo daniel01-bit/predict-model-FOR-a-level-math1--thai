@@ -183,7 +183,15 @@ def record_request_usage(provider: str, model: str) -> None:
         _RPM_TIMESTAMPS[key] = ts_list
 
         entry = _QUOTA_STATE.setdefault(key, {"rpd_used": 0})
-        entry["rpd_used"] = int(entry.get("rpd_used", 0)) + 1
+        defaults = GEMINI_FREE_QUOTA_DEFAULTS.get(model, {"rpd": 20, "rpm": 10})
+        rpd_limit = int(entry.get("rpd_limit") or defaults["rpd"])
+        # If a call succeeded after a previous exhaustion, the provider has reset quota.
+        if entry.get("exhausted_kind") == "rpd" or int(entry.get("rpd_used", 0)) >= rpd_limit:
+            entry["rpd_used"] = 1
+        else:
+            entry["rpd_used"] = int(entry.get("rpd_used", 0)) + 1
+        entry["exhausted_kind"] = None
+        entry["reset_at"] = 0.0
         entry["last_used_at"] = now
         _save_quota_state_unlocked()
 
@@ -234,8 +242,21 @@ def get_quota_status(provider: str, model: str) -> dict:
 
     with _QUOTA_LOCK:
         _load_quota_state_unlocked()
-        entry = dict(_QUOTA_STATE.get(key, {}))
-        rpm_used = sum(1 for t in _RPM_TIMESTAMPS.get(key, []) if now - t < 60.0)
+        raw_entry = _QUOTA_STATE.get(key)
+        if raw_entry:
+            raw_reset_at = float(raw_entry.get("reset_at", 0.0) or 0.0)
+            raw_kind = raw_entry.get("exhausted_kind")
+            if raw_kind and raw_reset_at > 0 and now >= raw_reset_at:
+                # Reset window has elapsed -> clear exhaustion and restore daily counter if RPD reset
+                if raw_kind == "rpd":
+                    raw_entry["rpd_used"] = 0
+                raw_entry["exhausted_kind"] = None
+                raw_entry["reset_at"] = 0.0
+                _save_quota_state_unlocked()
+        entry = dict(raw_entry or {})
+        rpm_ts = [t for t in _RPM_TIMESTAMPS.get(key, []) if now - t < 60.0]
+        _RPM_TIMESTAMPS[key] = rpm_ts
+        rpm_used = len(rpm_ts)
 
     if provider != "gemini":
         return {

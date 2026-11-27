@@ -1897,14 +1897,15 @@
   setInterval(rotateGreeting, 5500);
   setInterval(() => {
     if (lastQuotaData && quotaResetTargetMs > 0) {
-      renderQuotaHud(lastQuotaData, lastQuotaData._alternatives || []);
       if (Date.now() >= quotaResetTargetMs) {
         quotaResetTargetMs = 0;
         refreshQuota(true);
+      } else {
+        renderQuotaHud(lastQuotaData, lastQuotaData._alternatives || []);
       }
     }
   }, 1000);
-  setInterval(() => refreshQuota(), 4000);
+  setInterval(() => refreshQuota(), 2000);
   loadProviders();
 </script>
 </body>
