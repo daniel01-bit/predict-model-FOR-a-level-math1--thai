@@ -19,8 +19,36 @@
     --text: #f3f4f6;
     --text-muted: #9ca3af;
     --accent: #84a94d;
+    --accent-bright: #a3c668;
+    --accent-soft: #d9eab8;
+    --accent-rgb: 132, 169, 77;
+    --accent-deep-rgb: 107, 142, 35;
+    --aura-1: rgba(74, 134, 52, 0.46);
+    --aura-2: rgba(38, 72, 28, 0.25);
     --danger: #f87171;
     --ok: #34d399;
+  }
+
+  /* Level 2 Theme: Royal Violet / Purple (+50% Hard) */
+  body[data-level="2"] {
+    --accent: #a855f7;
+    --accent-bright: #c084fc;
+    --accent-soft: #e9d5ff;
+    --accent-rgb: 168, 85, 247;
+    --accent-deep-rgb: 126, 34, 206;
+    --aura-1: rgba(139, 58, 224, 0.52);
+    --aura-2: rgba(68, 24, 118, 0.28);
+  }
+
+  /* Level 3 Theme: Crimson Red (+125% Nightmare) */
+  body[data-level="3"] {
+    --accent: #ef4444;
+    --accent-bright: #f87171;
+    --accent-soft: #fecaca;
+    --accent-rgb: 239, 68, 68;
+    --accent-deep-rgb: 185, 28, 28;
+    --aura-1: rgba(212, 42, 42, 0.54);
+    --aura-2: rgba(112, 18, 22, 0.30);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,18 +62,19 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Subtle deep green bottom ambient aura */
+  /* Dynamic ambient bottom aura (Olive -> Purple -> Crimson) */
   body::before {
     content: "";
     position: fixed;
     inset: 0;
     pointer-events: none;
     background: radial-gradient(
-      ellipse 72% 42% at 50% 106%,
-      rgba(74, 134, 52, 0.46) 0%,
-      rgba(38, 72, 28, 0.25) 45%,
+      ellipse 72% 44% at 50% 106%,
+      var(--aura-1) 0%,
+      var(--aura-2) 46%,
       rgba(0, 0, 0, 0) 78%
     );
+    transition: background 0.45s ease;
     z-index: 0;
   }
 
@@ -485,29 +514,29 @@
     height: 280px;
     overflow: visible;
     animation: donutSpin 14s linear infinite;
-    filter: drop-shadow(0 0 26px rgba(107, 142, 35, 0.34));
+    filter: drop-shadow(0 0 26px rgba(var(--accent-deep-rgb), 0.42));
   }
 
   .donut-ring {
-    fill: rgba(107, 142, 35, 0.06);
-    stroke: rgba(132, 169, 77, 0.28);
+    fill: rgba(var(--accent-deep-rgb), 0.08);
+    stroke: rgba(var(--accent-rgb), 0.34);
     stroke-width: 1.2;
     stroke-dasharray: 4 5;
   }
 
   .donut-inner-ring {
     fill: none;
-    stroke: rgba(132, 169, 77, 0.18);
+    stroke: rgba(var(--accent-rgb), 0.22);
     stroke-width: 1;
   }
 
   .donut-text {
-    fill: #edf7db;
+    fill: var(--accent-soft);
     font-family: 'JetBrains Mono', monospace;
     font-size: 21px;
     font-weight: 600;
     letter-spacing: 0.05em;
-    transition: opacity 0.35s ease;
+    transition: opacity 0.35s ease, fill 0.35s ease;
   }
 
   .donut-text.fading,
@@ -520,11 +549,197 @@
     font-family: 'Times New Roman', Georgia, serif;
     font-size: 34px;
     font-weight: 600;
-    color: #b7d484;
-    opacity: 0.92;
+    color: var(--accent-bright);
+    opacity: 0.94;
     user-select: none;
-    text-shadow: 0 0 18px rgba(132, 169, 77, 0.45);
-    transition: opacity 0.35s ease;
+    text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.50);
+    transition: opacity 0.35s ease, color 0.35s ease;
+  }
+
+  /* Difficulty Picker Panel (shown after choosing a mode, before starting generation) */
+  .difficulty-panel {
+    display: none;
+    width: 100%;
+    max-width: 460px;
+    background: rgba(20, 21, 27, 0.92);
+    border: 1px solid rgba(var(--accent-rgb), 0.36);
+    border-radius: 28px;
+    padding: 26px 28px 24px;
+    box-shadow: 0 16px 42px rgba(var(--accent-deep-rgb), 0.22);
+    transition: border-color 0.35s ease, box-shadow 0.35s ease;
+  }
+
+  .difficulty-panel.active { display: block; }
+
+  .diff-top-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+
+  .diff-mode-chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: var(--accent-soft);
+    background: rgba(var(--accent-deep-rgb), 0.24);
+    border: 1px solid rgba(var(--accent-rgb), 0.38);
+    padding: 5px 12px;
+    border-radius: 999px;
+    transition: all 0.35s ease;
+  }
+
+  .diff-level-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-bright);
+    letter-spacing: 0.04em;
+    transition: color 0.35s ease;
+  }
+
+  .diff-slider-wrap {
+    padding: 8px 4px 12px;
+  }
+
+  .diff-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      rgba(var(--accent-rgb), 0.85) 0%,
+      rgba(var(--accent-rgb), 0.85) var(--slider-pct, 0%),
+      rgba(255, 255, 255, 0.12) var(--slider-pct, 0%),
+      rgba(255, 255, 255, 0.12) 100%
+    );
+    outline: none;
+    cursor: pointer;
+    transition: background 0.25s ease;
+  }
+
+  .diff-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-bright);
+    border: 3px solid #0b0c10;
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.38), 0 4px 14px rgba(0, 0, 0, 0.55);
+    cursor: grab;
+    transition: transform 0.16s ease, background 0.35s ease, box-shadow 0.35s ease;
+  }
+
+  .diff-range::-webkit-slider-thumb:hover {
+    transform: scale(1.12);
+  }
+
+  .diff-range::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-bright);
+    border: 3px solid #0b0c10;
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.38);
+    cursor: grab;
+  }
+
+  .diff-ticks {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .diff-tick-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 8px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    transition: all 0.22s ease;
+  }
+
+  .diff-tick-btn:hover {
+    color: var(--text);
+    border-color: rgba(var(--accent-rgb), 0.45);
+  }
+
+  .diff-tick-btn.active {
+    background: rgba(var(--accent-deep-rgb), 0.24);
+    border-color: rgba(var(--accent-rgb), 0.72);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(var(--accent-deep-rgb), 0.24);
+  }
+
+  .diff-tick-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .diff-tick-sub {
+    font-size: 11px;
+    opacity: 0.82;
+  }
+
+  .diff-desc-box {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(var(--accent-rgb), 0.22);
+    text-align: left;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-muted);
+    transition: border-color 0.35s ease;
+  }
+
+  .diff-desc-title {
+    color: var(--accent-soft);
+    font-weight: 600;
+    margin-bottom: 3px;
+    font-size: 13px;
+  }
+
+  .diff-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    align-items: center;
+  }
+
+  .diff-start-btn {
+    flex: 1;
+    padding: 12px 22px;
+    border-radius: 999px;
+    background: rgba(var(--accent-deep-rgb), 0.34);
+    border: 1px solid rgba(var(--accent-rgb), 0.72);
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.16s ease, box-shadow 0.25s ease;
+  }
+
+  .diff-start-btn:hover {
+    background: rgba(var(--accent-deep-rgb), 0.52);
+    transform: translateY(-1px);
+    box-shadow: 0 10px 26px rgba(var(--accent-deep-rgb), 0.35);
   }
 
   @keyframes donutSpin {
@@ -560,14 +775,14 @@
   .mode-pill:hover {
     transform: translateY(-2px);
     background: rgba(34, 37, 48, 0.96);
-    border-color: rgba(132, 169, 77, 0.48);
-    box-shadow: 0 10px 30px rgba(74, 112, 38, 0.30);
+    border-color: rgba(var(--accent-rgb), 0.52);
+    box-shadow: 0 10px 30px rgba(var(--accent-deep-rgb), 0.30);
   }
 
   .mode-pill:active { transform: translateY(0); }
 
   .mode-pill.primary-mock {
-    border-color: rgba(132, 169, 77, 0.40);
+    border-color: rgba(var(--accent-rgb), 0.42);
   }
 
   .pill-left {
@@ -590,9 +805,9 @@
   .pill-badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11.5px;
-    color: #d9eab8;
-    background: rgba(107, 142, 35, 0.20);
-    border: 1px solid rgba(132, 169, 77, 0.34);
+    color: var(--accent-soft);
+    background: rgba(var(--accent-deep-rgb), 0.22);
+    border: 1px solid rgba(var(--accent-rgb), 0.36);
     padding: 5px 12px;
     border-radius: 999px;
     white-space: nowrap;
@@ -632,9 +847,9 @@
   .progress-fill {
     height: 100%;
     width: 6%;
-    background: linear-gradient(90deg, #6b8e23, #a3c668);
+    background: linear-gradient(90deg, var(--accent), var(--accent-bright));
     border-radius: 999px;
-    transition: width 0.35s ease;
+    transition: width 0.35s ease, background 0.35s ease;
   }
 
   .progress-label {
@@ -693,8 +908,8 @@
   }
 
   .pdf-pill-row:hover {
-    border-color: rgba(132, 169, 77, 0.48);
-    box-shadow: 0 8px 26px rgba(74, 112, 38, 0.28);
+    border-color: rgba(var(--accent-rgb), 0.52);
+    box-shadow: 0 8px 26px rgba(var(--accent-deep-rgb), 0.28);
   }
 
   .pdf-main-link {
@@ -729,8 +944,8 @@
   }
 
   .mini-action:hover {
-    background: rgba(132, 169, 77, 0.22);
-    border-color: rgba(132, 169, 77, 0.55);
+    background: rgba(var(--accent-rgb), 0.22);
+    border-color: rgba(var(--accent-rgb), 0.58);
   }
 
   .summary-strip {
@@ -841,8 +1056,8 @@
   }
 
   .choice-pill.selected {
-    background: rgba(132, 169, 77, 0.20);
-    border-color: rgba(132, 169, 77, 0.68);
+    background: rgba(var(--accent-rgb), 0.20);
+    border-color: rgba(var(--accent-rgb), 0.68);
   }
 
   .choice-pill.correct {
@@ -894,8 +1109,8 @@
   }
 
   .primary-pill-btn {
-    background: rgba(107, 142, 35, 0.28);
-    border: 1px solid rgba(132, 169, 77, 0.60);
+    background: rgba(var(--accent-deep-rgb), 0.28);
+    border: 1px solid rgba(var(--accent-rgb), 0.60);
     color: #fff;
     border-radius: 999px;
     padding: 10px 22px;
@@ -906,7 +1121,7 @@
     transition: background 0.15s;
   }
 
-  .primary-pill-btn:hover { background: rgba(107, 142, 35, 0.42); }
+  .primary-pill-btn:hover { background: rgba(var(--accent-deep-rgb), 0.44); }
 
   .sq-feedback {
     display: none;
@@ -1106,7 +1321,7 @@
 
     <!-- 3 Floating Oval Pills -->
     <section id="modeStack" class="pill-stack" aria-label="เลือกโหมดสร้างข้อสอบ">
-      <button class="mode-pill" type="button" onclick="startGeneration('question')">
+      <button class="mode-pill" type="button" onclick="openDifficultyStep('question')">
         <span class="pill-left">
           <span class="pill-title">QUESTION</span>
           <span class="pill-desc">สุ่มโจทย์ 1 ข้อ ทำและตรวจคำตอบบนหน้าเว็บทันที</span>
@@ -1114,7 +1329,7 @@
         <span class="pill-badge">1 ข้อ • Interactive</span>
       </button>
 
-      <button class="mode-pill" type="button" onclick="startGeneration('mini_test')">
+      <button class="mode-pill" type="button" onclick="openDifficultyStep('mini_test')">
         <span class="pill-left">
           <span class="pill-title">MINI-TEST</span>
           <span class="pill-desc">แบบทดสอบ 15 ข้อ สุ่มกระจายให้หลากหลายบทที่สุด</span>
@@ -1122,13 +1337,59 @@
         <span class="pill-badge">15 ข้อ</span>
       </button>
 
-      <button class="mode-pill primary-mock" type="button" onclick="startGeneration('mock_test')">
+      <button class="mode-pill primary-mock" type="button" onclick="openDifficultyStep('mock_test')">
         <span class="pill-left">
           <span class="pill-title">MOCK-TEST</span>
           <span class="pill-desc">ข้อสอบจำลอง A-Level 70 จริงจากโมเดลทำนาย (Blueprint ครบ 30 ข้อ)</span>
         </span>
         <span class="pill-badge">30 ข้อ • A-Level 70</span>
       </button>
+    </section>
+
+    <!-- Step 2: Difficulty Slider Panel (Level 1=Olive, Level 2=Purple, Level 3=Crimson) -->
+    <section id="difficultyPanel" class="difficulty-panel" aria-label="เลือกระดับความยาก">
+      <div class="diff-top-meta">
+        <span id="diffModeChip" class="diff-mode-chip">MOCK-TEST • 30 ข้อ</span>
+        <span id="diffLevelBadge" class="diff-level-badge">LEVEL 1 • A-LEVEL</span>
+      </div>
+
+      <div class="diff-slider-wrap">
+        <input
+          id="difficultySlider"
+          class="diff-range"
+          type="range"
+          min="1"
+          max="3"
+          step="1"
+          value="1"
+          aria-label="เลื่อนเลือกระดับความยาก 1 ถึง 3"
+          oninput="setDifficultyLevel(this.value)"
+        />
+        <div class="diff-ticks">
+          <button type="button" class="diff-tick-btn active" data-level="1" onclick="setDifficultyLevel(1)">
+            <span class="diff-tick-num">LEVEL 1</span>
+            <span class="diff-tick-sub">A-Level จริง</span>
+          </button>
+          <button type="button" class="diff-tick-btn" data-level="2" onclick="setDifficultyLevel(2)">
+            <span class="diff-tick-num">LEVEL 2</span>
+            <span class="diff-tick-sub">ยาก +50%</span>
+          </button>
+          <button type="button" class="diff-tick-btn" data-level="3" onclick="setDifficultyLevel(3)">
+            <span class="diff-tick-num">LEVEL 3</span>
+            <span class="diff-tick-sub">โหด +125%</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="diff-desc-box">
+        <div id="diffDescTitle" class="diff-desc-title">Level 1 — มาตรฐาน A-Level 61 (สสวท.)</div>
+        <div id="diffDescBody">ระดับความยากตรงตามข้อสอบจริง สสวท. เหมาะสำหรับฝึกจับเวลาและวัดคะแนนจริง</div>
+      </div>
+
+      <div class="diff-actions">
+        <button type="button" class="icon-btn" onclick="resetToHome()">ย้อนกลับ</button>
+        <button type="button" class="diff-start-btn" onclick="confirmAndStartGeneration()">เริ่มสร้างข้อสอบ</button>
+      </div>
     </section>
 
     <!-- Live Generation Progress -->
@@ -1148,7 +1409,7 @@
     <section id="resultPanel" class="result-panel">
       <div class="pdf-pill-row">
         <a id="examDownloadMain" class="pdf-main-link" href="#" download>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a3c668" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           <span class="pill-left">
             <span class="pill-title" style="font-size:14.5px; letter-spacing:0.02em;">ตัวข้อสอบ (Exam Paper PDF)</span>
             <span class="pill-desc">ฟอร์แมตมาตรฐาน A-Level รหัสวิชา 61 • พร้อมดาวความยาก 1–5</span>
@@ -1266,8 +1527,41 @@
     { lang: "JA", text: "モードを選んで始めましょう" }
   ];
 
+  // 7 Languages x 3 Challenging Greetings (active on Difficulty Picker step)
+  const CHALLENGE_GREETINGS = [
+    { lang: "TH", text: "แน่จริงก็เลื่อนไป Level 3 สิ" },
+    { lang: "TH", text: "ไหวแค่ไหน... ลองเลือกระดับความโหดดูเลย" },
+    { lang: "TH", text: "กล้าท้าชนโจทย์คัดแยกคะแนนไหมล่ะ" },
+
+    { lang: "DE", text: "Traust du dich an Level 3 heran?" },
+    { lang: "DE", text: "Wie hart darf die Prüfung heute sein?" },
+    { lang: "DE", text: "Zeig mir, was du wirklich draufhast" },
+
+    { lang: "EN", text: "Dare to slide it all the way to Level 3?" },
+    { lang: "EN", text: "How tough do you think you are?" },
+    { lang: "EN", text: "Pick your pain. Prove your math." },
+
+    { lang: "FR", text: "Oses-tu tenter le niveau 3 ?" },
+    { lang: "FR", text: "Jusqu'où iras-tu dans la difficulté ?" },
+    { lang: "FR", text: "Montre-moi ce que tu vaux vraiment" },
+
+    { lang: "RU", text: "Рискнёшь выбрать 3-й уровень?" },
+    { lang: "RU", text: "Насколько сложные задачи ты потянешь?" },
+    { lang: "RU", text: "Докажи, что тебе это по зубам" },
+
+    { lang: "ZH", text: "敢直接拉到 Level 3 挑战吗？" },
+    { lang: "ZH", text: "你的数学极限到底在哪里？" },
+    { lang: "ZH", text: "选个难度，看看你有多强" },
+
+    { lang: "JA", text: "レベル3に挑む覚悟はあるか？" },
+    { lang: "JA", text: "どこまで本気を出せるかな？" },
+    { lang: "JA", text: "難易度を選んで、実力を証明しろ" }
+  ];
+
   let lastGreetingIdx = -1;
   let isGenerating = false;
+  let isChoosingDifficulty = false;
+  let pendingMode = null;
   let activeJobId = null;
   let providersCache = [];
   let currentJobData = null;
@@ -1484,15 +1778,16 @@
     const elText = document.getElementById("greetingText");
     const elLang = document.getElementById("greetingLang");
     const donutText = document.getElementById("donutTextEl");
-    let idx = Math.floor(Math.random() * GREETINGS.length);
-    if (idx === lastGreetingIdx) idx = (idx + 1) % GREETINGS.length;
+    const pool = isChoosingDifficulty ? CHALLENGE_GREETINGS : GREETINGS;
+    let idx = Math.floor(Math.random() * pool.length);
+    if (idx === lastGreetingIdx) idx = (idx + 1) % pool.length;
     lastGreetingIdx = idx;
 
     if (isGenerating && donutText) {
       donutText.classList.add("fading");
       setTimeout(() => {
-        elText.textContent = GREETINGS[idx].text;
-        elLang.textContent = GREETINGS[idx].lang;
+        elText.textContent = pool[idx].text;
+        elLang.textContent = pool[idx].lang;
         updateDonutPiDigits();
         donutText.classList.remove("fading");
       }, 320);
@@ -1501,8 +1796,8 @@
 
     elText.classList.add("fading");
     setTimeout(() => {
-      elText.textContent = GREETINGS[idx].text;
-      elLang.textContent = GREETINGS[idx].lang;
+      elText.textContent = pool[idx].text;
+      elLang.textContent = pool[idx].lang;
       elText.classList.remove("fading");
     }, 320);
   }
@@ -1598,18 +1893,94 @@
     document.getElementById("errorBanner").classList.remove("active");
   }
 
+  let selectedDifficultyLevel = 1;
+
+  const DIFFICULTY_META = {
+    1: {
+      badge: "LEVEL 1 • A-LEVEL",
+      title: "Level 1 — มาตรฐาน A-Level 61 (สสวท.)",
+      desc: "ระดับความยากตรงตามข้อสอบจริง สสวท. เหมาะสำหรับฝึกจับเวลาและวัดคะแนนจริง"
+    },
+    2: {
+      badge: "LEVEL 2 • HARD +50%",
+      title: "Level 2 — ยากขึ้น +50% (บูรณาการข้ามบท)",
+      desc: "เพิ่มความซับซ้อน ซ่อนเงื่อนไขและตัวหลอกหลายชั้น เหมาะสำหรับตั้งเป้าคะแนน 70–85+"
+    },
+    3: {
+      badge: "LEVEL 3 • NIGHTMARE +125%",
+      title: "Level 3 — โหดสุด +125% (คัดแยกคะแนนระดับท็อป)",
+      desc: "โจทย์หลายขั้นตอนเชื่อมโยงลึกและดักทางทุกมุม เหมาะสำหรับสายแข็งที่อยากล่า 90–100 เต็ม"
+    }
+  };
+
+  const MODE_CHIPS = {
+    question: "QUESTION • 1 ข้อ",
+    mini_test: "MINI-TEST • 15 ข้อ",
+    mock_test: "MOCK-TEST • 30 ข้อ"
+  };
+
+  function setDifficultyLevel(level) {
+    const lv = Math.max(1, Math.min(3, Number(level) || 1));
+    selectedDifficultyLevel = lv;
+    document.body.dataset.level = String(lv);
+
+    const slider = document.getElementById("difficultySlider");
+    if (slider) {
+      slider.value = String(lv);
+      slider.style.setProperty("--slider-pct", `${((lv - 1) / 2) * 100}%`);
+    }
+
+    document.querySelectorAll("#difficultyPanel .diff-tick-btn").forEach(btn => {
+      btn.classList.toggle("active", Number(btn.dataset.level) === lv);
+    });
+
+    const meta = DIFFICULTY_META[lv];
+    const badgeEl = document.getElementById("diffLevelBadge");
+    const titleEl = document.getElementById("diffDescTitle");
+    const bodyEl = document.getElementById("diffDescBody");
+    if (badgeEl) badgeEl.textContent = meta.badge;
+    if (titleEl) titleEl.textContent = meta.title;
+    if (bodyEl) bodyEl.textContent = meta.desc;
+  }
+
+  function openDifficultyStep(mode) {
+    hideError();
+    const val = document.getElementById("modelSelect").value;
+    if (!val) return showError("กรุณาเลือกโมเดลก่อนเริ่มสร้างข้อสอบ");
+
+    pendingMode = mode;
+    isChoosingDifficulty = true;
+    document.getElementById("modeStack").style.display = "none";
+    document.getElementById("resultPanel").classList.remove("active");
+    document.getElementById("singleQuestionCard").classList.remove("active");
+    document.getElementById("progressCard").classList.remove("active");
+    document.getElementById("diffModeChip").textContent = MODE_CHIPS[mode] || mode.toUpperCase();
+    document.getElementById("difficultyPanel").classList.add("active");
+    setDifficultyLevel(1);
+    rotateGreeting();
+  }
+
+  function confirmAndStartGeneration() {
+    if (!pendingMode) return;
+    isChoosingDifficulty = false;
+    document.getElementById("difficultyPanel").classList.remove("active");
+    startGeneration(pendingMode);
+  }
+
   async function startGeneration(mode) {
     hideError();
     const val = document.getElementById("modelSelect").value;
     if (!val) return showError("กรุณาเลือกโมเดลก่อนเริ่มสร้างข้อสอบ");
     const [provider, model] = val.split("::");
 
+    isChoosingDifficulty = false;
+    document.getElementById("difficultyPanel").classList.remove("active");
     document.getElementById("modeStack").style.display = "none";
     document.getElementById("resultPanel").classList.remove("active");
     document.getElementById("singleQuestionCard").classList.remove("active");
     document.getElementById("progressCard").classList.add("active");
     setGreetingDonutMode(true);
-    document.getElementById("progressTitle").textContent = `กำลังสร้าง ${mode.toUpperCase().replace("_", "-")}`;
+    document.getElementById("progressTitle").textContent = `กำลังสร้าง ${mode.toUpperCase().replace("_", "-")} • Lv.${selectedDifficultyLevel}`;
     document.getElementById("progressFill").style.width = "8%";
     document.getElementById("progressLabel").textContent = `เชื่อมต่อ ${provider} (${model})...`;
 
@@ -1617,7 +1988,13 @@
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, provider, model, target_year_be: 2570 })
+        body: JSON.stringify({
+          mode,
+          provider,
+          model,
+          target_year_be: 2570,
+          difficulty_level: selectedDifficultyLevel
+        })
       });
       if (!res.ok) {
         const err = await res.json();
@@ -1875,6 +2252,10 @@
 
   function resetToHome() {
     setGreetingDonutMode(false);
+    isChoosingDifficulty = false;
+    pendingMode = null;
+    setDifficultyLevel(1);
+    document.getElementById("difficultyPanel").classList.remove("active");
     document.getElementById("progressCard").classList.remove("active");
     document.getElementById("resultPanel").classList.remove("active");
     document.getElementById("singleQuestionCard").classList.remove("active");
