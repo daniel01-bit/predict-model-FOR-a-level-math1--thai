@@ -53,13 +53,86 @@ def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
         raise ImportError(f"Module '{name}' is not allowed in SymPy sandbox")
     return __import__(name, globals, locals, fromlist, level)
 
+
+class ALevelSymPyGate:
+    @staticmethod
+    def verify_sequence_n(a1, d, b1, r, target_sum):
+        n = sp.Symbol("n", integer=True, positive=True)
+        eq = sp.Eq((a1 + (n - 1) * d) + (b1 * r ** (n - 1)), target_sum)
+        sol = [s for s in sp.solve(eq, n) if s.is_integer and s > 0]
+        assert len(sol) == 1, f"Invalid n for sequence equation: {sol}"
+        return int(sol[0])
+
+    @staticmethod
+    def verify_infinite_series(expr_str, start_idx=1):
+        n = sp.Symbol("n", integer=True, positive=True)
+        expr = sp.sympify(expr_str, locals={"n": n})
+        total = sp.summation(expr, (n, start_idx, sp.oo))
+        assert total.is_finite and total.is_real, f"Series diverges or invalid: {total}"
+        return total
+
+    @staticmethod
+    def verify_function_range(expr_str, x_min, x_max):
+        x = sp.Symbol("x", real=True)
+        expr = sp.sympify(expr_str, locals={"x": x})
+        rng = sp.calculus.util.function_range(expr, x, sp.Interval(x_min, x_max))
+        assert isinstance(rng, sp.Interval), f"Discontinuous or invalid range: {rng}"
+        return rng.start, rng.end
+
+    @staticmethod
+    def verify_piecewise_continuity(pieces_with_bounds):
+        x = sp.Symbol("x", real=True)
+        for i in range(len(pieces_with_bounds) - 1):
+            expr_left, c_point = pieces_with_bounds[i]
+            expr_right, _ = pieces_with_bounds[i + 1]
+            lim_l = sp.limit(sp.sympify(expr_left, locals={"x": x}), x, c_point, dir="-")
+            lim_r = sp.limit(sp.sympify(expr_right, locals={"x": x}), x, c_point, dir="+")
+            assert sp.simplify(lim_l - lim_r) == 0, f"Discontinuous at x={c_point}: {lim_l} != {lim_r}"
+        return True
+
+    @staticmethod
+    def verify_conic_params(conic_type, a, b, c):
+        assert a > 0 and b > 0 and c > 0, "Conic parameters must be positive"
+        if conic_type == "ellipse":
+            assert sp.simplify(a**2 - (b**2 + c**2)) == 0, f"Invalid ellipse: {a}^2 != {b}^2 + {c}^2"
+        elif conic_type == "hyperbola":
+            assert sp.simplify(c**2 - (a**2 + b**2)) == 0, f"Invalid hyperbola: {c}^2 != {a}^2 + {b}^2"
+        else:
+            raise ValueError(f"Unknown conic_type: {conic_type}")
+        return True
+
+    @staticmethod
+    def verify_curves_intersect(eq1_str, eq2_str):
+        x, y = sp.symbols("x y", real=True)
+        sols = sp.solve(
+            [sp.sympify(eq1_str, locals={"x": x, "y": y}), sp.sympify(eq2_str, locals={"x": x, "y": y})],
+            (x, y),
+        )
+        assert len(sols) > 0, "Curves do not intersect in real plane!"
+        return sols
+
+    @staticmethod
+    def verify_vector_area(u_list, v_list):
+        u = sp.Matrix(u_list)
+        v = sp.Matrix(v_list)
+        area = sp.simplify(u.cross(v).norm())
+        assert area > 0, "Vectors are parallel (Area = 0)!"
+        return area
+
+    @staticmethod
+    def verify_vector_volume(u_list, v_list, w_list):
+        mat = sp.Matrix([u_list, v_list, w_list])
+        vol = sp.Abs(mat.det())
+        assert vol > 0, "Vectors are coplanar (Volume = 0)!"
+        return vol
+
 SAFE_BUILTINS = {
     "__import__": _safe_import,
     "abs": abs, "min": min, "max": max, "sum": sum, "range": range,
     "len": len, "int": int, "float": float, "round": round, "pow": pow,
     "enumerate": enumerate, "zip": zip, "list": list, "tuple": tuple,
     "set": set, "dict": dict, "sorted": sorted, "any": any, "all": all,
-    "bool": bool, "str": str, "map": map, "filter": filter,
+    "bool": bool, "str": str, "map": map, "filter": filter, "isinstance": isinstance,
     "AssertionError": AssertionError, "ValueError": ValueError,
     "RuntimeError": RuntimeError, "Exception": Exception,
 }
@@ -80,6 +153,7 @@ for raw in sys.stdin:
             "fractions": fractions,
             "statistics": statistics,
             "decimal": decimal,
+            "ALevelSymPyGate": ALevelSymPyGate,
         }
         exec(code, ns)
         if "ANSWER" not in ns:
@@ -346,13 +420,108 @@ RED_FLAG_PHRASES = (
 
 
 def sanitize_latex_text(text: str) -> str:
-    """Repair common JSON-eaten LaTeX control characters (\t -> \times, \f -> \frac, \r -> \rightarrow)."""
+    """Repair common JSON-eaten LaTeX control characters (\\t -> \\times/\\text/\\theta, \\f -> \\frac, \\r -> \\rightarrow)."""
     if not text:
         return text
     text = text.replace("\t", r"\t").replace("\x0c", r"\f").replace("\x08", r"\b").replace("\r", r"\r")
     text = re.sub(r"(\d|\$|\s)imes(\d|\$|\s)", r"\1\\times\2", text)
+    text = re.sub(r"(?<![a-zA-Z\\])rac\{", r"\\frac{", text)
+    text = re.sub(r"(?<![a-zA-Z\\])ext\{", r"\\text{", text)
+    text = re.sub(r"(?<!\\)\bightarrow\b", r"\\rightarrow", text)
+    text = re.sub(r"(?<!\\)\bheta\b", r"\\theta", text)
     text = text.replace("\\n", "\n")
     return text.strip()
+
+
+class ALevelSymPyGate:
+    """Reusable deterministic SymPy validators for the 4 highest-error A-Level Math 1 chapters."""
+
+    @staticmethod
+    def verify_sequence_n(a1, d, b1, r, target_sum) -> int:
+        import sympy as sp
+
+        n = sp.Symbol("n", integer=True, positive=True)
+        eq = sp.Eq((a1 + (n - 1) * d) + (b1 * r ** (n - 1)), target_sum)
+        sol = [s for s in sp.solve(eq, n) if s.is_integer and s > 0]
+        assert len(sol) == 1, f"Invalid n for sequence equation: {sol}"
+        return int(sol[0])
+
+    @staticmethod
+    def verify_infinite_series(expr_str: str, start_idx: int = 1):
+        import sympy as sp
+
+        n = sp.Symbol("n", integer=True, positive=True)
+        expr = sp.sympify(expr_str, locals={"n": n})
+        total = sp.summation(expr, (n, start_idx, sp.oo))
+        assert total.is_finite and total.is_real, f"Series diverges or invalid: {total}"
+        return total
+
+    @staticmethod
+    def verify_function_range(expr_str: str, x_min, x_max):
+        import sympy as sp
+
+        x = sp.Symbol("x", real=True)
+        expr = sp.sympify(expr_str, locals={"x": x})
+        rng = sp.calculus.util.function_range(expr, x, sp.Interval(x_min, x_max))
+        assert isinstance(rng, sp.Interval), f"Discontinuous or invalid range: {rng}"
+        return rng.start, rng.end
+
+    @staticmethod
+    def verify_piecewise_continuity(pieces_with_bounds: list[tuple[str, float | int | None]]) -> bool:
+        import sympy as sp
+
+        x = sp.Symbol("x", real=True)
+        for i in range(len(pieces_with_bounds) - 1):
+            expr_left, c_point = pieces_with_bounds[i]
+            expr_right, _ = pieces_with_bounds[i + 1]
+            lim_l = sp.limit(sp.sympify(expr_left, locals={"x": x}), x, c_point, dir="-")
+            lim_r = sp.limit(sp.sympify(expr_right, locals={"x": x}), x, c_point, dir="+")
+            assert sp.simplify(lim_l - lim_r) == 0, f"Discontinuous at x={c_point}: {lim_l} != {lim_r}"
+        return True
+
+    @staticmethod
+    def verify_conic_params(conic_type: str, a, b, c) -> bool:
+        import sympy as sp
+
+        assert a > 0 and b > 0 and c > 0, "Conic parameters must be positive"
+        if conic_type == "ellipse":
+            assert sp.simplify(a**2 - (b**2 + c**2)) == 0, f"Invalid ellipse: {a}^2 != {b}^2 + {c}^2"
+        elif conic_type == "hyperbola":
+            assert sp.simplify(c**2 - (a**2 + b**2)) == 0, f"Invalid hyperbola: {c}^2 != {a}^2 + {b}^2"
+        else:
+            raise ValueError(f"Unknown conic_type: {conic_type}")
+        return True
+
+    @staticmethod
+    def verify_curves_intersect(eq1_str: str, eq2_str: str):
+        import sympy as sp
+
+        x, y = sp.symbols("x y", real=True)
+        sols = sp.solve(
+            [sp.sympify(eq1_str, locals={"x": x, "y": y}), sp.sympify(eq2_str, locals={"x": x, "y": y})],
+            (x, y),
+        )
+        assert len(sols) > 0, "Curves do not intersect in real plane!"
+        return sols
+
+    @staticmethod
+    def verify_vector_area(u_list: list, v_list: list):
+        import sympy as sp
+
+        u = sp.Matrix(u_list)
+        v = sp.Matrix(v_list)
+        area = sp.simplify(u.cross(v).norm())
+        assert area > 0, "Vectors are parallel (Area = 0)!"
+        return area
+
+    @staticmethod
+    def verify_vector_volume(u_list: list, v_list: list, w_list: list):
+        import sympy as sp
+
+        mat = sp.Matrix([u_list, v_list, w_list])
+        vol = sp.Abs(mat.det())
+        assert vol > 0, "Vectors are coplanar (Volume = 0)!"
+        return vol
 
 
 def sanitize_choice_text(choice: str) -> str:
@@ -519,6 +688,14 @@ def verify_generated_question(
             )
 
     if question_format == QuestionFormat.NUMERIC:
+        if "/" in expected_answer or r"\frac" in expected_answer:
+            return VerificationResult(
+                passed=False,
+                computed_answer=computed,
+                expected_answer=expected_answer,
+                max_stem_similarity=round(max_sim, 4),
+                error=f"Part 2 (grid-in) answer cannot be a raw fraction ({expected_answer!r}); use a terminating decimal or scale the target expression",
+            )
         exp_num = _parse_numeric(expected_answer)
         if comp_num is None or exp_num is None:
             return VerificationResult(
@@ -527,6 +704,30 @@ def verify_generated_question(
                 expected_answer=expected_answer,
                 max_stem_similarity=round(max_sim, 4),
                 error="Numeric answer or SymPy output is not a valid number",
+            )
+        if comp_num < -1e-9 or exp_num < -1e-9:
+            return VerificationResult(
+                passed=False,
+                computed_answer=computed,
+                expected_answer=expected_answer,
+                max_stem_similarity=round(max_sim, 4),
+                error=f"Part 2 (grid-in) answer cannot be negative: {comp_num}",
+            )
+        if comp_num > 9999.99 + 1e-6 or exp_num > 9999.99 + 1e-6:
+            return VerificationResult(
+                passed=False,
+                computed_answer=computed,
+                expected_answer=expected_answer,
+                max_stem_similarity=round(max_sim, 4),
+                error=f"Part 2 (grid-in) answer exceeds A-Level grid limit (9999.99): {comp_num}",
+            )
+        if abs(comp_num * 100.0 - round(comp_num * 100.0)) > 1e-4:
+            return VerificationResult(
+                passed=False,
+                computed_answer=computed,
+                expected_answer=expected_answer,
+                max_stem_similarity=round(max_sim, 4),
+                error=f"Part 2 (grid-in) answer must have at most 2 decimal places: {comp_num}",
             )
         matched = _numbers_match(comp_num, exp_num, expected_answer)
         return VerificationResult(

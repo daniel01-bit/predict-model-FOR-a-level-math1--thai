@@ -223,6 +223,40 @@ def test_verifier_rounding_latex_and_sympy_edge_cases():
     assert ok_dict and math.isclose(float(val_dict), 3.0, rel_tol=1e-6)
 
 
+def test_alevel_sympy_gate_and_latex_auto_repair():
+    import pytest
+    from src.verifier import ALevelSymPyGate, run_sympy_code, sanitize_latex_text
+
+    # 1. Sequences & Series (n=3 -> a3=2+6=8, b3=1*2^2=4 -> sum=12)
+    assert ALevelSymPyGate.verify_sequence_n(2, 3, 1, 2, 12) == 3
+    assert ALevelSymPyGate.verify_infinite_series("1 / (2**n)", start_idx=1) == 1
+
+    # 2. Functions (parabola vertex inside closed interval [-1, 3] for x^2 - 2x = (x-1)^2 - 1 -> [-1, 3])
+    assert ALevelSymPyGate.verify_function_range("x**2 - 2*x", -1, 3) == (-1, 3)
+    assert ALevelSymPyGate.verify_piecewise_continuity([("x + 2", 1), ("3*x", None)]) is True
+    with pytest.raises(AssertionError):
+        ALevelSymPyGate.verify_piecewise_continuity([("x + 2", 1), ("5*x", None)])
+
+    # 3. Conics (Pythagorean triples & impossible hyperbola-asymptote intersection)
+    assert ALevelSymPyGate.verify_conic_params("ellipse", 5, 4, 3) is True
+    assert ALevelSymPyGate.verify_conic_params("hyperbola", 3, 4, 5) is True
+    with pytest.raises(AssertionError):
+        ALevelSymPyGate.verify_conic_params("ellipse", 3, 4, 5)
+    with pytest.raises(AssertionError):
+        ALevelSymPyGate.verify_curves_intersect("x**2/9 - y**2/16 - 1", "y - 4*x/3")
+
+    # 4. 3D Vectors (area & volume + zero-area rejection)
+    assert ALevelSymPyGate.verify_vector_area([1, 0, 0], [0, 3, 0]) == 3
+    assert ALevelSymPyGate.verify_vector_volume([2, 0, 0], [0, 3, 0], [0, 0, 4]) == 24
+    with pytest.raises(AssertionError):
+        ALevelSymPyGate.verify_vector_area([1, 2, 3], [2, 4, 6])
+
+    # 5. Sandbox exposes ALevelSymPyGate directly & sanitize_latex_text auto-repairs eaten escapes
+    ok_gate, val_gate = run_sympy_code("ANSWER = ALevelSymPyGate.verify_vector_volume([1,0,0],[0,2,0],[0,0,5])")
+    assert ok_gate and float(val_gate) == 10.0
+    assert sanitize_latex_text("rac{1}{2} + heta") == r"\frac{1}{2} + \theta"
+
+
 def test_llm_router_circuit_breaker_and_provider_guards():
     from src.llm_router import _is_daily_quota_exhausted, _parse_retry_after_seconds
 

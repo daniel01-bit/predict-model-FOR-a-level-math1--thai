@@ -12,6 +12,7 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
+from src.diversity import format_few_shot_block, sample_diversity_directive
 from src.llm_router import (
     JobCancelledError,
     check_cancelled,
@@ -134,14 +135,14 @@ CHAPTER_LOGIC_INVARIANTS: dict[str, str] = {
     "sets": "จำนวนสมาชิกในทุกบริเวณของแผนภาพเวนน์ต้องเป็นจำนวนเต็ม >= 0 และ n(A∩B) <= min(n(A), n(B)), n(A∪B) <= n(U)",
     "logic": "ห้ามใช้ sp.satisfiability หรือ equivalent ใน SymPy — ให้ใช้ itertools.product([True, False], repeat=n) ตรวจตารางค่าความจริง และตั้งคำถามหาจำนวนข้อที่ถูก/จำนวนกรณี",
     "real_numbers": "อสมการต้องถามหาค่าตัวเลขเดี่ยว (เช่น ผลบวกจำนวนเต็มที่เป็นคำตอบ หรือ a+b) และต้องหักค่าที่ทำให้ตัวส่วนเป็น 0 ออกเสมอ",
-    "functions": "ต้องระบุโดเมนชัดเจน ถ้าหาค่าสูงสุด/ต่ำสุดบนช่วงปิดต้องเช็กจุดปลายช่วงด้วย",
+    "functions": "ใช้ Reverse-Engineering Construction: ถ้าหาเรนจ์ของพาราโบลา f(x)=ax^2+bx+c บนช่วงปิด [x1,x2] ต้องคำนวณจุดยอด x_v=-b/(2a) และเช็ก {f(x1),f(x2),f(x_v)} เมื่อ x1<=x_v<=x2; ฟังก์ชันประกอบ f(g(x)) ต้องให้เรนจ์ของ g อยู่ในโดเมนของ f (ไม่หาร 0, รากคู่ >= 0, หลัง log > 0); ฟังก์ชันแยกช่วงต้องให้ lim ซ้าย == f(c) == lim ขวา",
     "expo_log": "ลอการิทึมต้อง assert หลัง log > 0 และฐาน > 0, != 1 ทุกคำตอบที่ได้",
     "trigonometry": "ต้อง assert |sin| <= 1, |cos| <= 1, อสมการสามเหลี่ยม a+b>c และเรนจ์หลักของ arcsin/arccos/arctan",
     "complex_numbers": "ใน SymPy ใช้ sp.I เท่านั้น (ห้ามใช้ i ตัวเล็ก) และทฤษฎีรากสังยุคใช้ได้เฉพาะพหุนามสัมประสิทธิ์จำนวนจริง",
     "matrices": "ถ้าใช้ A^{-1} ต้อง assert det(A) != 0 และห้ามกำหนดเงื่อนไข x != 0 ที่ขัดกับสมการ det = 0",
-    "sequences_series": "อนุกรมเรขาคณิตอนันต์ต้อง assert abs(r) < 1; คณิตศาสตร์การเงินต้องระบุงวดทบต้นและต้นงวด/ปลายงวดชัดเจน",
-    "analytic_geometry": "วงกลมต้อง r^2 > 0; วงรี c^2=a^2-b^2 (a>b); ไฮเพอร์โบลา c^2=a^2+b^2 และจุดบนไฮเพอร์โบลาไม่มีวันตัดเส้นกำกับ; ระบุชื่อจุด/สามเหลี่ยมให้ครบ",
-    "vectors_3d": "ต้อง assert |cos(theta)| <= 1 และพื้นที่/ปริมาตรต้อง > 0",
+    "sequences_series": "ใช้ Reverse-Engineering Construction: กำหนดค่าจำนวนเต็มบวกของ a1,d,b1,r และ n เป้าหมายก่อนแล้วค่อยคำนวณ K=a_n+b_n; อนุกรมเรขาคณิตอนันต์ต้อง assert |r| < 1 และระบุพจน์แรกตามดัชนีเริ่ม (n=1 vs n=0) ชัดเจน; อนุกรมเทเลสโคปิก 1/((n+a)(n+b)) ต้องคูณตัวประกอบ 1/(b-a) เสมอ; คณิตศาสตร์การเงินระบุงวดทบต้นและต้นงวด/ปลายงวดชัดเจน",
+    "analytic_geometry": "ใช้ Reverse-Engineering Construction ด้วยสามจำนวนพีทาโกรัส (3,4,5)/(5,12,13)/(8,15,17): วงกลม r^2>0; วงรี a^2=b^2+c^2 (a>b>0, a>c>0); ไฮเพอร์โบลา c^2=a^2+b^2 (c>a>0, c>b>0) และห้ามวางจุด P บนทั้งไฮเพอร์โบลาและเส้นกำกับ (ไม่มีวันตัดกัน!); เส้นขนาน Ax+By+C=0 ให้เลือก (A,B) ที่ sqrt(A^2+B^2) เป็นจำนวนเต็มแล้วคำนวณ C2=C1±d*sqrt(A^2+B^2)",
+    "vectors_3d": "ใช้ Reverse-Engineering Construction: กำหนดองค์ประกอบจำนวนเต็มของ u,v,w ก่อนแล้วคำนวณพื้นที่ |u×v| หรือปริมาตร |u·(v×w)| ด้วย SymPy ก่อนเขียนโจทย์; ห้ามสุ่มเวกเตอร์ขนานกัน (|u×v|>0) หรืออยู่ระนาบเดียวกัน (|u·(v×w)|>0); ห้ามแก้ตัวเลขเวกเตอร์ใน solution_steps_th; ถ้ามีมุมให้ใช้มุมมาตรฐาน 30,45,60,90,120,135,150 องศาและ assert -1 <= (u·v)/(|u||v|) <= 1",
     "statistics": "ข้อมูลที่เรียงลำดับต้องคงลำดับจริงหลังแก้หาตัวแปร x; ค่าเฉลี่ย มัธยฐาน ฐานนิยม ห้ามขัดแย้งกัน; ระบุชัดว่าเป็นประชากร (หาร N) หรือตัวอย่าง (หาร n-1)",
     "prob_distributions": "ต้อง assert 0 <= p <= 1 และผลรวมความน่าจะเป็น = 1; ถ้าใช้โค้งปกติ (Z-score) ต้องให้ค่าตาราง P(Z<=z) ที่จำเป็นครบในโจทย์",
     "counting": "คำตอบต้องเป็นจำนวนเต็ม >= 0; ใน SymPy ใช้ sp.binomial(n, r) และ sp.factorial(n) (ห้ามใช้ sp.comb)",
@@ -240,12 +241,15 @@ def generate_verified_slot(
     max_retries: int = 5,
     _allow_fallback: bool = True,
     cancel_event: threading.Event | None = None,
+    used_archetypes: set[str] | None = None,
 ) -> dict:
     """Generate a single original IPST-style A-Level 70 question and verify it with SymPy."""
     check_cancelled(cancel_event)
     effective_retries = min(max_retries, 2) if provider == "ollama" else max_retries
     ctx = _lookup_curriculum_context(slot.chapter_id, slot.sub_skill_id)
     seed_obj = generate_verified_seed(slot.chapter_id)
+    _, diversity_hint = sample_diversity_directive(slot.chapter_id, used_archetypes=used_archetypes)
+    few_shot_block = format_few_shot_block(slot.chapter_id, k=1)
     locked_choices: list[str] | None = None
     locked_answer: str | None = None
     if seed_obj and provider == "ollama":
@@ -277,19 +281,25 @@ def generate_verified_slot(
     fmt_instruction = (
         "ปรนัย 5 ตัวเลือก (choices_latex ต้องมี 5 ตัวเลือกที่เป็นตัวเลข/ค่าไม่ซ้ำกัน และ answer เป็น '1'-'5')"
         if slot.question_format == QuestionFormat.MCQ_5
-        else "อัตนัยระบายคำตอบตัวเลข (choices_latex เป็น [] และ answer เป็นตัวเลขทศนิยมหรือจำนวนเต็มที่แน่นอน)"
+        else (
+            "อัตนัยระบายคำตอบตัวเลข Part 2 (choices_latex=[]): กฎเหล็กกระดาษคำตอบ สสวท. — "
+            "คำตอบสุดท้ายต้องเป็นจำนวนไม่ติดลบ `0 <= answer <= 9999.99` และทศนิยมไม่เกิน 2 ตำแหน่งเท่านั้น "
+            "(ห้ามติดลบ ห้ามมีเครื่องหมาย `-` และห้ามตอบเศษส่วน `/` เช่น `3/16` — ถ้าคิดได้ติดลบหรือเศษส่วน "
+            "ให้ปรับคำถามเป็นค่าสัมบูรณ์ `|ans|` หรือคูณสเกลเช่น `16P` เพื่อให้ฝนคำตอบบวกที่ลงตัวได้จริง!)"
+        )
     )
 
     prompt = f"""คุณคือผู้ออกข้อสอบ A-Level คณิตศาสตร์ประยุกต์ 1 รหัสวิชา 61 (สสวท. หลักสูตร 2560) สำหรับปี 2570
-จงสร้างโจทย์ใหม่ 100% ข้อที่ {slot.slot_number} ตามสเปกต่อไปนี้:
+จงสร้างโจทย์ใหม่ 100% ข้อที่ {slot.slot_number} ระดับความยากมาตรฐาน A-Level จริง (**เน้น 3–4 ดาว** เชื่อมโยงอย่างน้อย 2 แนวคิด งดโจทย์ 1 ดาวที่แทนสูตรบรรทัดเดียว) ตามสเปกต่อไปนี้:
 - บทหลัก: {ctx['chapter_th']} ({slot.chapter_id})
 - ทักษะย่อยเป้าหมาย: {slot.sub_skill_id}
 - หัวข้อในหลักสูตร สสวท.: {', '.join(ctx['topics_th'])}
 - บทบูรณาการเสริม (ถ้าเหมาะสม): {slot.secondary_chapter or 'ไม่มี'}
 - รูปแบบข้อสอบ: {fmt_instruction}
 - บริบทประยุกต์สไตล์ สสวท.: {', '.join(ctx['ipst_applied_contexts'])}
+- ความหลากหลายรอบนี้ (ห้ามซ้ำแม่แบบเดิม): {diversity_hint}
 - จุดหลอกที่ควรแฝงในตัวเลือกหลอก: {', '.join(traps[:3] or ctx['classic_traps'])}
-- กฎลอจิกเฉพาะบทนี้ (ห้ามละเมิด): {_chapter_guard_hint(slot.chapter_id)}{seed_block}
+- กฎลอจิกเฉพาะบทนี้ (ห้ามละเมิด): {_chapter_guard_hint(slot.chapter_id)}{seed_block}{few_shot_block}
 
 กฎเหล็ก:
 1. ห้ามใช้เนื้อหานอกหลักสูตร 2560 (ห้ามใช้โลปิตาล, กำหนดการเชิงเส้น, ทฤษฎีจำนวนแบบเก่า)
@@ -528,12 +538,14 @@ def generate_verified_batch(
     provider: str = "gemini",
     model_name: str = "gemini-3.5-flash-lite",
     cancel_event: threading.Event | None = None,
+    used_archetypes: set[str] | None = None,
 ) -> list[dict]:
     """Generate a batch of up to 5 questions in ONE API call, verify each with SymPy, and repair only failed slots."""
     check_cancelled(cancel_event)
     spec_blocks = []
     ctxs = {}
     seeded_slots: set[int] = set()
+    batch_used = used_archetypes if used_archetypes is not None else set()
     for idx, slot in enumerate(batch_slots, start=1):
         ctx = _lookup_curriculum_context(slot.chapter_id, slot.sub_skill_id)
         ctxs[slot.slot_number] = ctx
@@ -541,26 +553,27 @@ def generate_verified_batch(
         fmt_desc = (
             "mcq_5 (5 ตัวเลือกเป็นตัวเลข/นิพจน์คณิตล้วน ห้ามมีคำภาษาไทยในตัวเลือก, answer='1'-'5')"
             if slot.question_format == QuestionFormat.MCQ_5
-            else "numeric (choices_latex=[], answer=ตัวเลขทศนิยม/จำนวนเต็ม)"
+            else "numeric Part 2 (choices_latex=[], คำตอบต้องเป็นจำนวนไม่ติดลบ 0<=ans<=9999.99 ทศนิยม<=2ตำแหน่ง ห้ามติดลบ ห้ามเศษส่วน /)"
         )
         seed_obj = generate_verified_seed(slot.chapter_id)
         if seed_obj is not None:
             seeded_slots.add(slot.slot_number)
+        _, div_hint = sample_diversity_directive(slot.chapter_id, used_archetypes=batch_used)
         seed_hint = f" | SymPy-Seed (ใช้ตัวเลขนี้ได้ตรงๆ): {seed_obj.params_description_th}" if seed_obj else ""
         spec_blocks.append(
             f"{idx}) ข้อที่ {slot.slot_number} | บท: {ctx['chapter_th']} ({slot.chapter_id}) | ทักษะ: {slot.sub_skill_id} "
             f"| บทเสริม: {slot.secondary_chapter or '-'} | รูปแบบ: {fmt_desc} | จุดหลอก: {', '.join(traps[:2])} "
-            f"| กฎลอจิกบทนี้: {_chapter_guard_hint(slot.chapter_id)}{seed_hint}"
+            f"| {div_hint} | กฎลอจิกบทนี้: {_chapter_guard_hint(slot.chapter_id)}{seed_hint}"
         )
 
     prompt = rf"""คุณคือผู้ออกข้อสอบ A-Level คณิตศาสตร์ประยุกต์ 1 รหัสวิชา 61 (สสวท. หลักสูตร 2560) สำหรับปี 2570
-จงสร้างโจทย์ใหม่ 100% จำนวน {len(batch_slots)} ข้อ เรียงตามลำดับสเปกด้านล่างในฟิลด์ `items` (ต้องครบ {len(batch_slots)} ข้อ):
+จงสร้างโจทย์ใหม่ 100% จำนวน {len(batch_slots)} ข้อ (**เน้นความยากระดับ 3–4 ดาว** เชื่อมโยง 2 แนวคิด งดโจทย์ 1 ดาวแทนสูตรตรงๆ) เรียงตามลำดับสเปกด้านล่างในฟิลด์ `items` (ต้องครบ {len(batch_slots)} ข้อ):
 {chr(10).join(spec_blocks)}
 
 กฎเหล็กทุกข้อ:
 1. ห้ามใช้เนื้อหานอกหลักสูตร 2560 (ห้ามใช้โลปิตาล, กำหนดการเชิงเส้น, ทฤษฎีจำนวนแบบเก่า)
-2. คำตอบต้องเป็นค่าตัวเลขเดี่ยวที่แน่นอน ห้ามใช้ช่วง `(a, b)` / `\\infty` หรือข้อความภาษาไทยในตัวเลือก (ถ้าเป็นอสมการให้ถามหาผลบวกจำนวนเต็มหรือค่า $a+b$ แทน)
-3. ประเมิน `difficulty_stars` 1–5 ดาวให้ตรงความยากจริง
+2. คำตอบต้องเป็นค่าตัวเลขเดี่ยวที่แน่นอน ห้ามใช้ช่วง `(a, b)` / `\\infty` หรือข้อความภาษาไทยในตัวเลือก; และสำหรับข้อ `numeric` (Part 2 ระบายตัวเลข) คำตอบต้องอยู่ในช่วง `0 <= ans <= 9999.99` ทศนิยมไม่เกิน 2 ตำแหน่ง ห้ามติดลบและห้ามเป็นเศษส่วน `/` เด็ดขาด
+3. ประเมิน `difficulty_stars` 1–5 ดาวให้ตรงความยากจริง (เป้าหมาย 3–4 ดาว)
 4. `sympy_code` ต้องใช้ `sp` (sympy) คำนวณค่าคำตอบทางคณิตศาสตร์จริงแล้วกำหนดลงตัวแปร `ANSWER` (ห้ามใส่หมายเลขตัวเลือก 1–5 ลงใน `ANSWER`) และ **ห้ามแก้ตัวเลขโจทย์หรือเขียน "ขออภัย/ปรับโจทย์" ใน `solution_steps_th` เด็ดขาด!**
 """
 
