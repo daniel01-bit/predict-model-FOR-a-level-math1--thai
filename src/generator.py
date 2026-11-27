@@ -13,6 +13,8 @@ from typing import Callable, Literal
 from pydantic import BaseModel, Field, ValidationError
 
 from src.llm_router import (
+    JobCancelledError,
+    check_cancelled,
     generate_structured_json,
     recommend_batch_size,
     recommend_workers,
@@ -25,7 +27,11 @@ from src.model import (
 )
 from src.question_pool import GLOBAL_POOL, VerifiedQuestionPool
 from src.schema import DifficultyLevel, QuestionFormat, QuestionStyle, load_syllabus
-from src.sympy_seeds import generate_verified_seed
+from src.sympy_seeds import (
+    build_deterministic_mcq_choices,
+    generate_verified_seed,
+    verify_seed_numbers_in_stem,
+)
 from src.verifier import sanitize_choice_text, sanitize_latex_text, verify_generated_question
 
 
@@ -60,8 +66,10 @@ def audit_math_logic_batch(
     candidates: list[tuple[ExamSlot, "GeneratedQuestionDraft"]],
     provider: str,
     model_name: str,
+    cancel_event: threading.Event | None = None,
 ) -> dict[int, tuple[bool, str]]:
     """Independent LLM mathematical logic & consistency auditor (checks contradictions, solvability, realism)."""
+    check_cancelled(cancel_event)
     if not candidates:
         return {}
     blocks = []
@@ -97,8 +105,11 @@ def audit_math_logic_batch(
             temperature=0.0,
             timeout_seconds=25.0,
             thinking_budget=64,
+            cancel_event=cancel_event,
         )
         return {a.slot_number: (a.logically_valid, a.issue) for a in res.audits}
+    except JobCancelledError:
+        raise
     except Exception as exc:
         print(f"[audit] warning: logic auditor skipped ({exc})", flush=True)
         return {slot.slot_number: (True, "") for slot, _ in candidates}
@@ -228,17 +239,41 @@ def generate_verified_slot(
     model_name: str = "gemini-3.5-flash-lite",
     max_retries: int = 5,
     _allow_fallback: bool = True,
+    cancel_event: threading.Event | None = None,
 ) -> dict:
     """Generate a single original IPST-style A-Level 70 question and verify it with SymPy."""
+    check_cancelled(cancel_event)
+    effective_retries = min(max_retries, 2) if provider == "ollama" else max_retries
     ctx = _lookup_curriculum_context(slot.chapter_id, slot.sub_skill_id)
     seed_obj = generate_verified_seed(slot.chapter_id)
-    seed_block = (
-        f"\n- **ตัวเลขแกนกลางที่ผ่าน SymPy แล้ว (แนะนำให้นำไปแต่งเป็นโจทย์ประยุกต์ภาษาไทยเพื่อให้คำตอบลงตัว 100%):**\n"
-        f"  {seed_obj.params_description_th}\n"
-        f"  (สามารถใช้ sympy_code นี้ได้โดยตรง: `{seed_obj.sympy_code}`)\n"
-        if seed_obj
-        else ""
-    )
+    locked_choices: list[str] | None = None
+    locked_answer: str | None = None
+    if seed_obj and provider == "ollama":
+        if slot.question_format == QuestionFormat.MCQ_5:
+            locked_choices, locked_answer = build_deterministic_mcq_choices(
+                seed_obj.exact_answer, slot.chapter_id
+            )
+            choice_hint = (
+                f"  • ตัวเลือก 5 ข้อที่ล็อกไว้แล้ว: {locked_choices} | หมายเลขคำตอบที่ถูก = '{locked_answer}' (ค่า = `{seed_obj.exact_answer}`)\n"
+            )
+        else:
+            locked_choices = []
+            locked_answer = seed_obj.exact_answer
+            choice_hint = f"  • คำตอบอัตนัยที่ล็อกไว้แล้ว = `{locked_answer}`\n"
+        seed_block = (
+            f"\n- **[บังคับ 100% สำหรับ Local Model] นำเงื่อนไขและตัวเลขทุกตัวจาก SymPy-First Seed ด้านล่างไปแต่งเป็นโจทย์ภาษาไทย ห้ามเปลี่ยนตัวเลขแม้แต่ตัวเดียว:**\n"
+            f"  {seed_obj.params_description_th}\n"
+            f"{choice_hint}"
+            f"  • คัดลอก `sympy_code` นี้ไปใส่โดยตรง:\n```python\n{seed_obj.sympy_code}\n```\n"
+        )
+    elif seed_obj:
+        seed_block = (
+            f"\n- **ตัวเลขแกนกลางที่ผ่าน SymPy แล้ว (แนะนำให้นำไปแต่งเป็นโจทย์ประยุกต์ภาษาไทยเพื่อให้คำตอบลงตัว 100%):**\n"
+            f"  {seed_obj.params_description_th}\n"
+            f"  (สามารถใช้ sympy_code นี้ได้โดยตรง: `{seed_obj.sympy_code}`)\n"
+        )
+    else:
+        seed_block = ""
     fmt_instruction = (
         "ปรนัย 5 ตัวเลือก (choices_latex ต้องมี 5 ตัวเลือกที่เป็นตัวเลข/ค่าไม่ซ้ำกัน และ answer เป็น '1'-'5')"
         if slot.question_format == QuestionFormat.MCQ_5
@@ -261,7 +296,7 @@ def generate_verified_slot(
 2. **ห้ามสร้างเงื่อนไขขัดแย้งกันเองเด็ดขาด!** ตรวจสอบก่อนเสมอว่าทุกสมการ เงื่อนไขโดเมน (เช่น $x \neq 0$, ข้อมูลเรียงจากน้อยไปมาก, ลิมิตซ้าย=ขวา=$f(c)$, สมบัติภาคตัดกรวยจริง) เป็นจริงพร้อมกันและมีคำตอบเดียวที่หาได้เสมอ
 3. คำตอบต้องเป็น **ค่าตัวเลขเดี่ยวที่แน่นอน** เท่านั้น (เช่น `12`, `-3.5`, `$\\frac{5}{2}$`, `$\\sqrt{3}$`) — **ห้ามใช้ช่วงคำตอบ `(a, b)`, `[a, b]`, `\\infty` หรือเซต `{...}` เป็นตัวเลือก!** สำหรับโจทย์อสมการให้ถามหา *"ผลบวกของจำนวนเต็มที่เป็นคำตอบ"*, *"จำนวนเต็มน้อยที่สุดที่สอดคล้อง"*, หรือ *"ค่าของ $a+b$ เมื่อเซตคำตอบคือ $(a, b)$"* และสำหรับบทตรรกศาสตร์/เซต ให้ถามเป็น **จำนวนข้อที่ถูกต้อง / จำนวนสมาชิก** (ห้ามใส่ข้อความภาษาไทยใน `choices_latex`)
 4. ใช้ LaTeX ที่ถูกต้อง 100% (ใส่เครื่องหมาย `$` เปิด-ปิดให้ครบคู่ และ escape backslash ให้ถูกต้องใน JSON เช่น `\\times`, `\\frac`, `\\sqrt`)
-5. เลือกใช้ตัวเลขในโจทย์ที่ **คิดเลขลงตัวและไม่ซับซ้อนเกินไป** เพื่อให้คำตอบของ `sympy_code`, `choices_latex`, และ `solution_steps_th` ตรงกันเป๊ะ 100%
+5. เลือกใช้ตัวเลขในโจทย์ที่ **คิดเลขลงตัวและไม่ซับซ้อนเกินไป** เพื่อให้คำตอบของ `sympy_code`, `choices_latex`, และ `solution_steps_th` ตรงกันเป๊ะ 100% — **ห้ามแอบแก้ไขตัวเลขโจทย์หรือเขียนว่า "ปรับโจทย์/ปรับเวกเตอร์/ขออภัย" ใน `solution_steps_th` เด็ดขาด!**
 6. ประเมินระดับความยากเป็น `difficulty_stars` ตั้งแต่ 1 ถึง 5 ดาว (1=พื้นฐานมาก, 2=ค่อนข้างง่าย, 3=มาตรฐาน A-Level, 4=ยาก/บูรณาการ, 5=ยากมาก/คัดแยกคะแนน)
 7. ในฟิลด์ `sympy_code` ต้องเขียนโค้ด Python ที่ใช้ `sp` (sympy) คำนวณหาคำตอบจริงจากเงื่อนไขโจทย์ + ใส่ `assert` ครบ 4 ด้าน: (ก) กรองโดเมนแล้ว `assert len(valid_sols) == 1` (ข) แก้ทุกเงื่อนไขเป็นระบบสมการเดียวกันแล้ว `assert` ว่าไม่ขัดแย้งกัน (ค) `assert` นิยามคณิตศาสตร์ (เช่น ลิมิตซ้าย=ขวา=f(c), det!=0) (ง) `assert len(ANSWER.free_symbols) == 0` ห้ามติดตัวแปรอิสระ (ห้าม hardcode `ANSWER = ...` และห้ามใส่หมายเลขตัวเลือก 1–5 ลงใน `ANSWER`)
 """
@@ -269,15 +304,16 @@ def generate_verified_slot(
     last_error = ""
     last_computed: str | None = None
     last_draft_summary = ""
-    for attempt in range(max_retries + 1):
+    for attempt in range(effective_retries + 1):
+        check_cancelled(cancel_event)
         set_ai_activity(
             "working",
             f"แต่งโจทย์ข้อ {slot.slot_number} • {ctx['chapter_th']}",
-            f"โมเดล {model_name} (รอบที่ {attempt + 1}/{max_retries + 1})"
+            f"โมเดล {model_name} (รอบที่ {attempt + 1}/{effective_retries + 1})"
             + (" • ใช้ SymPy-First Seed" if seed_obj else ""),
         )
         print(
-            f"[gen] slot={slot.slot_number} ({slot.sub_skill_id}) provider={provider}:{model_name} attempt={attempt + 1}/{max_retries + 1}...",
+            f"[gen] slot={slot.slot_number} ({slot.sub_skill_id}) provider={provider}:{model_name} attempt={attempt + 1}/{effective_retries + 1}...",
             flush=True,
         )
         if last_error:
@@ -306,18 +342,39 @@ def generate_verified_slot(
                     schema_cls=GeneratedQuestionDraft,
                     temperature=0.45 if attempt == 0 else 0.15,
                     thinking_budget=128 if attempt == 0 else 512,
+                    cancel_event=cancel_event,
                 )
             )
+        except JobCancelledError:
+            raise
         except ValidationError as val_exc:
+            check_cancelled(cancel_event)
             last_error = f"Invalid/truncated JSON output: {str(val_exc)[:180]}"
             set_ai_activity(
                 "working",
                 f"ข้อ {slot.slot_number} JSON ไม่ครบ • กำลังให้แก้ใหม่",
-                f"รอบที่ {attempt + 1}/{max_retries + 1} • {ctx['chapter_th']}",
+                f"รอบที่ {attempt + 1}/{effective_retries + 1} • {ctx['chapter_th']}",
             )
             print(f"[gen] slot={slot.slot_number} RETRY (JSON): {last_error}", flush=True)
-            time.sleep(0.3)
+            time.sleep(0.1)
             continue
+        check_cancelled(cancel_event)
+        # True Neuro-Symbolic Lock for Local Ollama: Python/SymPy owns sympy_code, choices_latex,
+        # and answer 100%, while Stem Integrity Gate guarantees the LLM kept every seed number intact.
+        if provider == "ollama" and seed_obj is not None and locked_answer is not None and locked_choices is not None:
+            stem_ok, stem_err = verify_seed_numbers_in_stem(seed_obj, draft.stem_latex)
+            if not stem_ok:
+                last_error = stem_err or "Stem altered seed parameters"
+                print(f"[gen] slot={slot.slot_number} RETRY (StemGate): {last_error}", flush=True)
+                time.sleep(0.1)
+                continue
+            draft = draft.model_copy(
+                update={
+                    "sympy_code": seed_obj.sympy_code,
+                    "choices_latex": list(locked_choices),
+                    "answer": locked_answer,
+                }
+            )
         set_ai_activity(
             "working",
             f"รัน SymPy ตรวจคำตอบข้อ {slot.slot_number}",
@@ -334,11 +391,15 @@ def generate_verified_slot(
             chapter_id=slot.chapter_id,
         )
         if ver.passed:
-            # Option A (Selective Audit): SymPy-First clean 1st-pass items already satisfy
-            # all 5 Global SymPy Gates + Quality Gates; run LLM Logic Audit on retries or unseeded slots.
-            needs_llm_audit = (seed_obj is None) or (attempt > 0)
+            # Skip redundant LLM Logic Audit on Local Ollama (SymPy + 5 Global Gates already enforce correctness)
+            needs_llm_audit = (provider != "ollama") and ((seed_obj is None) or (attempt > 0))
             if needs_llm_audit:
-                audit_map = audit_math_logic_batch([(slot, draft)], provider=provider, model_name=model_name)
+                audit_map = audit_math_logic_batch(
+                    [(slot, draft)],
+                    provider=provider,
+                    model_name=model_name,
+                    cancel_event=cancel_event,
+                )
                 is_logical, logic_issue = audit_map.get(slot.slot_number, (True, ""))
             else:
                 is_logical, logic_issue = True, ""
@@ -368,6 +429,7 @@ def generate_verified_slot(
         time.sleep(0.1)
 
     # Fallback: if a stubborn sub-skill still failed, try an alternate sub-skill in the SAME strand so the exam never crashes
+    check_cancelled(cancel_event)
     if _allow_fallback:
         syllabus = load_syllabus()
         for strand in syllabus.strands:
@@ -402,10 +464,11 @@ def generate_verified_slot(
                         model_name=model_name,
                         max_retries=2,
                         _allow_fallback=False,
+                        cancel_event=cancel_event,
                     )
 
     raise RuntimeError(
-        f"Slot {slot.slot_number} ({slot.sub_skill_id}) failed SymPy verification: {last_error}"
+        f"Slot {slot.slot_number} ({ctx['chapter_th']} / {slot.sub_skill_id}) failed SymPy verification: {last_error}"
     )
 
 
@@ -464,8 +527,10 @@ def generate_verified_batch(
     historical_stems: list[str],
     provider: str = "gemini",
     model_name: str = "gemini-3.5-flash-lite",
+    cancel_event: threading.Event | None = None,
 ) -> list[dict]:
     """Generate a batch of up to 5 questions in ONE API call, verify each with SymPy, and repair only failed slots."""
+    check_cancelled(cancel_event)
     spec_blocks = []
     ctxs = {}
     seeded_slots: set[int] = set()
@@ -496,7 +561,7 @@ def generate_verified_batch(
 1. ห้ามใช้เนื้อหานอกหลักสูตร 2560 (ห้ามใช้โลปิตาล, กำหนดการเชิงเส้น, ทฤษฎีจำนวนแบบเก่า)
 2. คำตอบต้องเป็นค่าตัวเลขเดี่ยวที่แน่นอน ห้ามใช้ช่วง `(a, b)` / `\\infty` หรือข้อความภาษาไทยในตัวเลือก (ถ้าเป็นอสมการให้ถามหาผลบวกจำนวนเต็มหรือค่า $a+b$ แทน)
 3. ประเมิน `difficulty_stars` 1–5 ดาวให้ตรงความยากจริง
-4. `sympy_code` ต้องใช้ `sp` (sympy) คำนวณค่าคำตอบทางคณิตศาสตร์จริงแล้วกำหนดลงตัวแปร `ANSWER` (ห้ามใส่หมายเลขตัวเลือก 1–5 ลงใน `ANSWER`)
+4. `sympy_code` ต้องใช้ `sp` (sympy) คำนวณค่าคำตอบทางคณิตศาสตร์จริงแล้วกำหนดลงตัวแปร `ANSWER` (ห้ามใส่หมายเลขตัวเลือก 1–5 ลงใน `ANSWER`) และ **ห้ามแก้ตัวเลขโจทย์หรือเขียน "ขออภัย/ปรับโจทย์" ใน `solution_steps_th` เด็ดขาด!**
 """
 
     verified_by_slot: dict[int, dict] = {}
@@ -518,7 +583,9 @@ def generate_verified_batch(
             temperature=0.4,
             timeout_seconds=75.0,
             thinking_budget=128,
+            cancel_event=cancel_event,
         )
+        check_cancelled(cancel_event)
         set_ai_activity(
             "working",
             f"กำลังตรวจ SymPy ทั้ง {len(batch_slots)} ข้อ",
@@ -562,6 +629,7 @@ def generate_verified_batch(
                 [(s, d) for s, d, _ in audit_candidates],
                 provider=provider,
                 model_name=model_name,
+                cancel_event=cancel_event,
             )
             for slot, draft, ver in audit_candidates:
                 ok_logic, issue = audit_map.get(slot.slot_number, (True, ""))
@@ -574,21 +642,26 @@ def generate_verified_batch(
                         f"[gen-batch] slot={slot.slot_number} rejected by Logic Audit ({issue}) -> repairing solo",
                         flush=True,
                     )
+    except JobCancelledError:
+        raise
     except Exception as exc:
         err_str = str(exc)
         if any(tok in err_str for tok in ("429", "RESOURCE_EXHAUSTED", "โควตารายวัน", "unavailable")):
             raise
         print(f"[gen-batch] batch call failed ({exc}) -> falling back to solo slots", flush=True)
 
+    check_cancelled(cancel_event)
     missing_slots = [s for s in batch_slots if s.slot_number not in verified_by_slot]
     if len(missing_slots) == 1 or provider in ("ollama", "gemini"):
         for slot in missing_slots:
+            check_cancelled(cancel_event)
             verified_by_slot[slot.slot_number] = generate_verified_slot(
                 slot=slot,
                 traps=trap_bank.get(slot.sub_skill_id, []),
                 historical_stems=historical_stems,
                 provider=provider,
                 model_name=model_name,
+                cancel_event=cancel_event,
             )
     elif missing_slots:
         with ThreadPoolExecutor(max_workers=min(4, len(missing_slots))) as repair_pool:
@@ -600,10 +673,14 @@ def generate_verified_batch(
                     historical_stems,
                     provider,
                     model_name,
+                    5,
+                    True,
+                    cancel_event,
                 ): slot
                 for slot in missing_slots
             }
             for fut in as_completed(repair_futs):
+                check_cancelled(cancel_event)
                 slot = repair_futs[fut]
                 verified_by_slot[slot.slot_number] = fut.result()
 
@@ -624,7 +701,9 @@ def generate_mock_exam(
     on_progress: Callable[[int, int, ExamSlot], None] | None = None,
     use_pool: bool = True,
     pool: VerifiedQuestionPool | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> list[dict]:
+    check_cancelled(cancel_event)
     target_slots = slots[:limit] if limit else slots
     total = len(target_slots)
     eff_workers = max_workers if max_workers is not None else recommend_workers(provider)
@@ -658,6 +737,7 @@ def generate_mock_exam(
     elif rem_total <= 1 or eff_batch <= 1:
         completed = len(results)
         for slot in remaining_slots:
+            check_cancelled(cancel_event)
             if on_progress:
                 on_progress(completed, total, slot)
             item = generate_verified_slot(
@@ -666,7 +746,9 @@ def generate_mock_exam(
                 historical_stems=historical_stems,
                 provider=provider,
                 model_name=model_name,
+                cancel_event=cancel_event,
             )
+            check_cancelled(cancel_event)
             if use_pool:
                 active_pool.add(item)
             results.append(item)
@@ -689,21 +771,30 @@ def generate_mock_exam(
                     historical_stems,
                     provider,
                     model_name,
+                    cancel_event,
                 ): chunk
                 for chunk in chunks
             }
-            for fut in as_completed(future_map):
-                chunk = future_map[fut]
-                batch_items = fut.result()
-                if use_pool:
-                    active_pool.add_many(batch_items)
-                with lock:
-                    results.extend(batch_items)
-                    completed += len(batch_items)
-                    done_now = completed
-                if on_progress:
-                    on_progress(done_now, total, chunk[-1])
+            try:
+                for fut in as_completed(future_map):
+                    check_cancelled(cancel_event)
+                    chunk = future_map[fut]
+                    batch_items = fut.result()
+                    check_cancelled(cancel_event)
+                    if use_pool:
+                        active_pool.add_many(batch_items)
+                    with lock:
+                        results.extend(batch_items)
+                        completed += len(batch_items)
+                        done_now = completed
+                    if on_progress:
+                        on_progress(done_now, total, chunk[-1])
+            except JobCancelledError:
+                for f in future_map:
+                    f.cancel()
+                raise
 
+    check_cancelled(cancel_event)
     results.sort(key=lambda x: x["slot_number"])
 
     output_json.parent.mkdir(parents=True, exist_ok=True)

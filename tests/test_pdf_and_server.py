@@ -107,7 +107,11 @@ def test_verified_question_pool_non_repeating_checkout(tmp_path: Path):
         "stem_latex": "จงหาความชันของเส้นโค้ง $y = x^2$ ที่ $x = 3$",
         "choices_latex": ["2", "4", "6", "8", "10"],
         "answer": "3",
+        "sympy_code": "x = sp.Symbol('x')\nANSWER = sp.diff(x**2, x).subs(x, 3)",
+        "solution_steps_th": "หาอนุพันธ์ $y' = 2x$ แทน $x=3$ ได้ $6$",
     }
+    poisoned = dict(sample, stem_latex="เมทริกซ์ขนาด 3imes3 จงหาคำตอบ", solution_steps_th="ขออภัย ปรับเวกเตอร์ใหม่เพื่อให้ลงตัว")
+    assert pool.add(poisoned) == ""
     pool.add(sample)
     pool.add(sample)  # idempotent duplicate
     assert pool.stats() == {"total": 1, "unused": 1, "served": 0}
@@ -118,6 +122,81 @@ def test_verified_question_pool_non_repeating_checkout(tmp_path: Path):
     assert hit["from_pool"] is True
     assert pool.checkout("differentiation_tangent_rate", "mcq_5", slot_number=2) is None
     assert pool.stats() == {"total": 1, "unused": 0, "served": 1}
+
+
+def test_job_cancellation_immediate_signal():
+    import threading
+    import pytest
+    from src.llm_router import JobCancelledError, check_cancelled
+    from src.server import JOBS, JobState, api_cancel_job, serve_index
+
+    job = JobState(
+        job_id="test_cancel_1",
+        mode="question",
+        provider="ollama",
+        model="qwen3.5:4b",
+        target_year_be=2570,
+        status="running",
+    )
+    JOBS[job.job_id] = job
+    try:
+        res = api_cancel_job(job.job_id)
+        assert res["ok"] is True
+        assert res["status"] == "cancelled"
+        assert job.cancel_event.is_set()
+        with pytest.raises(JobCancelledError):
+            check_cancelled(job.cancel_event)
+    finally:
+        JOBS.pop(job.job_id, None)
+
+    body = serve_index().body.decode("utf-8")
+    assert "cancelCurrentJob()" in body
+
+
+def test_sympy_error_formatter_includes_chapter_and_reason():
+    from src.server import _format_user_friendly_error
+
+    err = RuntimeError("Slot 6 (เมทริกซ์ / matrix_operations_transpose) failed SymPy verification: SymPy='32.0' does not match choice #2 ('30')")
+    msg = _format_user_friendly_error(err, provider="ollama", model="qwen3.5:4b")
+    assert "เมทริกซ์ / matrix_operations_transpose" in msg
+    assert "SymPy='32.0' does not match choice #2 ('30')" in msg
+
+
+def test_deterministic_mcq_choices_and_stem_integrity_all_16_chapters():
+    import random
+    from src.sympy_seeds import (
+        _SEEDERS,
+        build_deterministic_mcq_choices,
+        generate_verified_seed,
+        verify_seed_numbers_in_stem,
+    )
+    from src.verifier import verify_generated_question
+
+    for ch_id in _SEEDERS:
+        seed = generate_verified_seed(ch_id, seed=123)
+        assert seed is not None
+        choices, ans_idx = build_deterministic_mcq_choices(seed.exact_answer, ch_id, rng=random.Random(42))
+        assert len(choices) == 5
+        assert ans_idx in {"1", "2", "3", "4", "5"}
+
+        ver = verify_generated_question(
+            stem_latex=f"โจทย์ทดสอบบท {ch_id}: {seed.params_description_th}",
+            question_format=QuestionFormat.MCQ_5,
+            choices_latex=choices,
+            expected_answer=ans_idx,
+            sympy_code=seed.sympy_code,
+            chapter_id=ch_id,
+        )
+        assert ver.passed, f"{ch_id} failed deterministic SymPy gate: {ver.error}"
+
+        ok, err = verify_seed_numbers_in_stem(seed, seed.params_description_th)
+        assert ok, f"{ch_id} stem integrity false negative: {err}"
+
+    # Verify Stem Integrity Gate rejects hallucinated/altered numbers
+    calc_seed = generate_verified_seed("sets", seed=123)
+    assert calc_seed is not None
+    ok_bad, err_bad = verify_seed_numbers_in_stem(calc_seed, "กลุ่มตัวอย่างทั้งหมด 999 คน ชอบ A 1 คน")
+    assert not ok_bad and err_bad is not None
 
 
 def test_llm_router_circuit_breaker_and_provider_guards():

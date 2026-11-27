@@ -643,6 +643,31 @@
     font-family: 'JetBrains Mono', 'Noto Sans Thai', monospace;
   }
 
+  .cancel-job-btn {
+    margin-top: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 22px;
+    border-radius: 999px;
+    background: rgba(248, 113, 113, 0.14);
+    border: 1px solid rgba(248, 113, 113, 0.48);
+    color: #fecaca;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+
+  .cancel-job-btn:hover {
+    background: rgba(248, 113, 113, 0.26);
+    border-color: rgba(248, 113, 113, 0.8);
+    color: #fff;
+    transform: translateY(-1px);
+  }
+
   /* Result State: Two Centered PDF Oval Pills (Top = Exam, Bottom = Answer Key) */
   .result-panel {
     display: none;
@@ -1114,6 +1139,9 @@
       </div>
       <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
       <div id="progressLabel" class="progress-label">เริ่มต้นระบบ SymPy Verification Gate...</div>
+      <button id="cancelJobBtn" type="button" class="cancel-job-btn" onclick="cancelCurrentJob()">
+        ยกเลิกการสร้าง
+      </button>
     </section>
 
     <!-- Result State: Top = Exam PDF, Bottom = Solutions PDF -->
@@ -1240,6 +1268,7 @@
 
   let lastGreetingIdx = -1;
   let isGenerating = false;
+  let activeJobId = null;
   let providersCache = [];
   let currentJobData = null;
   let pollTimer = null;
@@ -1595,19 +1624,47 @@
         throw new Error(err.detail || "Failed to start job");
       }
       const { job_id } = await res.json();
+      activeJobId = job_id;
       pollJob(job_id);
     } catch (err) {
+      activeJobId = null;
       resetToHome();
       showError(err.message);
+    }
+  }
+
+  async function cancelCurrentJob() {
+    const jobId = activeJobId;
+    activeJobId = null;
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+    resetToHome();
+    setHudActivity("idle", "พร้อมใช้งาน", "ยกเลิกการสร้างเรียบร้อยแล้ว", []);
+    if (jobId) {
+      try {
+        await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
+          method: "POST",
+          keepalive: true
+        });
+      } catch (_) {}
+      refreshQuota();
     }
   }
 
   function pollJob(jobId) {
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(async () => {
+      if (jobId !== activeJobId) {
+        clearInterval(pollTimer);
+        return;
+      }
       try {
         const res = await fetch(`/api/jobs/${jobId}`);
+        if (jobId !== activeJobId) return;
         const data = await res.json();
+        if (jobId !== activeJobId) return;
         const pct = Math.max(8, Math.round((data.completed / Math.max(1, data.total)) * 100));
         document.getElementById("progressCount").textContent = `${data.completed} / ${data.total}`;
         document.getElementById("progressFill").style.width = `${data.status === "done" ? 100 : pct}%`;
@@ -1615,11 +1672,18 @@
 
         if (data.status === "done") {
           clearInterval(pollTimer);
+          activeJobId = null;
           currentJobData = data;
           renderResult(data);
           refreshQuota();
+        } else if (data.status === "cancelled") {
+          clearInterval(pollTimer);
+          activeJobId = null;
+          resetToHome();
+          refreshQuota();
         } else if (data.status === "error") {
           clearInterval(pollTimer);
+          activeJobId = null;
           resetToHome();
           showError(data.error || "ไม่สามารถสร้างข้อสอบได้ กรุณาลองใหม่อีกครั้งครับ");
           refreshQuota(true);
@@ -1627,7 +1691,9 @@
           refreshQuota();
         }
       } catch (err) {
+        if (jobId !== activeJobId) return;
         clearInterval(pollTimer);
+        activeJobId = null;
         resetToHome();
         showError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์บนเครื่องได้\nแนะนำ: ตรวจสอบว่าเซิร์ฟเวอร์ยังทำงานอยู่ แล้วรีเฟรชหน้าเว็บครับ");
       }

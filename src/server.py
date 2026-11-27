@@ -20,6 +20,7 @@ from src.generator import (
     generate_verified_batch,
 )
 from src.llm_router import (
+    JobCancelledError,
     get_quota_status,
     list_provider_status,
     set_ai_activity,
@@ -49,7 +50,7 @@ class JobState:
     provider: str
     model: str
     target_year_be: int
-    status: str = "queued"          # queued | running | rendering_pdf | done | error
+    status: str = "queued"          # queued | running | rendering_pdf | done | error | cancelled
     completed: int = 0
     total: int = 1
     current_label: str = ""
@@ -60,6 +61,7 @@ class JobState:
     exam_html: Path | None = None
     solutions_html: Path | None = None
     finished_stamp: str = ""
+    cancel_event: threading.Event = field(default_factory=threading.Event)
 
 
 JOBS: dict[str, JobState] = {}
@@ -189,8 +191,15 @@ def _format_user_friendly_error(exc: Exception, provider: str = "", model: str =
             f"แนะนำ: รอสักครู่แล้วกดลองใหม่ หรือสลับไปใช้โมเดลอื่นด้านบนครับ"
         )
     if "sympy" in low or "verification" in low:
+        import re
+
+        m_slot = re.search(r"Slot\s+\d+\s*\(([^)]+)\)", raw)
+        m_reason = re.search(r"failed SymPy verification:\s*(.+)$", raw)
+        chapter_info = f"\nบทที่พบปัญหา: {m_slot.group(1)}" if m_slot else ""
+        reason_info = f"\nสาเหตุย่อ: {m_reason.group(1)[:140]}" if m_reason else ""
         return (
-            "ระบบตรวจความถูกต้องทางคณิตศาสตร์ (SymPy) พบว่าโจทย์ที่สุ่มได้ยังไม่สมบูรณ์\n"
+            "ระบบตรวจความถูกต้องทางคณิตศาสตร์ (SymPy) พบว่าโจทย์ที่สุ่มได้ยังไม่สมบูรณ์"
+            f"{chapter_info}{reason_info}\n"
             "แนะนำ: กดลองใหม่อีกครั้ง ระบบจะสุ่มและตรวจคำตอบใหม่ให้อัตโนมัติครับ"
         )
     return (
@@ -201,6 +210,8 @@ def _format_user_friendly_error(exc: Exception, provider: str = "", model: str =
 
 def _run_generation_job(job: JobState) -> None:
     try:
+        if job.cancel_event.is_set():
+            raise JobCancelledError("Job cancelled before start")
         job.status = "running"
         set_ai_activity("working", f"เตรียมโครงสร้างข้อสอบ ({job.model})...")
         _ensure_pool_seeded()
@@ -215,6 +226,8 @@ def _run_generation_job(job: JobState) -> None:
         out_dir = JOBS_DIR / job.job_id
 
         def on_progress(done: int, total: int, slot) -> None:
+            if job.cancel_event.is_set():
+                raise JobCancelledError("Job cancelled by user")
             job.completed = done
             job.total = total
             job.current_label = f"ข้อ {slot.slot_number}/{total} • {slot.chapter_id} ({slot.sub_skill_id})"
@@ -230,12 +243,17 @@ def _run_generation_job(job: JobState) -> None:
             model_name=job.model,
             on_progress=on_progress,
             use_pool=True,
+            cancel_event=job.cancel_event,
         )
+        if job.cancel_event.is_set():
+            raise JobCancelledError("Job cancelled by user")
         pool_hits = [s for s, it in zip(slots, items) if it.get("from_pool")]
         if pool_hits:
             _schedule_pool_refill(pool_hits, traps, historical_stems, job.provider, job.model)
         job.items = items
         if job.mode in ("mini_test", "mock_test"):
+            if job.cancel_event.is_set():
+                raise JobCancelledError("Job cancelled before PDF render")
             job.status = "rendering_pdf"
             job.current_label = "กำลังจัดหน้า PDF มาตรฐาน A-Level รหัสวิชา 61..."
             set_ai_activity("working", "กำลังจัดหน้า PDF A-Level 61...")
@@ -246,6 +264,8 @@ def _run_generation_job(job: JobState) -> None:
                 target_year_be=job.target_year_be,
                 out_dir=out_dir,
             )
+            if job.cancel_event.is_set():
+                raise JobCancelledError("Job cancelled during PDF render")
             job.exam_pdf = bundle["exam_pdf"]
             job.solutions_pdf = bundle["solutions_pdf"]
             job.exam_html = bundle["exam_html"]
@@ -258,7 +278,19 @@ def _run_generation_job(job: JobState) -> None:
         job.finished_stamp = f"{now:%H.%M-%d-%m}-{be_yy:02d}"
         job.status = "done"
         set_ai_activity("idle", "พร้อมใช้งาน")
+    except JobCancelledError:
+        print(f"[job-cancelled] {job.job_id} ({job.provider}/{job.model}) stopped immediately", flush=True)
+        job.status = "cancelled"
+        job.current_label = "ยกเลิกการสร้างแล้ว"
+        job.error = None
+        set_ai_activity("idle", "พร้อมใช้งาน")
     except Exception as exc:
+        if job.cancel_event.is_set():
+            job.status = "cancelled"
+            job.current_label = "ยกเลิกการสร้างแล้ว"
+            job.error = None
+            set_ai_activity("idle", "พร้อมใช้งาน")
+            return
         print(f"[job-error] {job.job_id} ({job.provider}/{job.model}): {exc}", flush=True)
         job.status = "error"
         job.error = _format_user_friendly_error(exc, job.provider, job.model)
@@ -330,6 +362,13 @@ def api_set_key(req: ApiKeyRequest) -> dict:
 
 @app.post("/api/generate")
 def api_generate(req: GenerateRequest) -> dict:
+    # Auto-cancel any prior in-flight job so zombie jobs never pile up on Ollama/API queues
+    for prev in list(JOBS.values()):
+        if prev.status in ("queued", "running", "rendering_pdf"):
+            prev.cancel_event.set()
+            prev.status = "cancelled"
+            prev.current_label = "ยกเลิกงานเก่าอัตโนมัติ"
+
     job_id = uuid.uuid4().hex[:12]
     total_map = {"question": 1, "mini_test": 15, "mock_test": 30}
     job = JobState(
@@ -344,6 +383,20 @@ def api_generate(req: GenerateRequest) -> dict:
     thread = threading.Thread(target=_run_generation_job, args=(job,), daemon=True)
     thread.start()
     return {"job_id": job_id, "status": job.status, "total": job.total}
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+def api_cancel_job(job_id: str) -> dict:
+    job = JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    job.cancel_event.set()
+    if job.status in ("queued", "running", "rendering_pdf"):
+        job.status = "cancelled"
+        job.current_label = "ยกเลิกการสร้างแล้ว"
+        job.error = None
+    set_ai_activity("idle", "พร้อมใช้งาน")
+    return {"ok": True, "job_id": job.job_id, "status": job.status}
 
 
 @app.get("/api/jobs/{job_id}")

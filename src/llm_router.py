@@ -28,6 +28,15 @@ from pydantic import BaseModel
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 T = TypeVar("T", bound=BaseModel)
 
+
+class JobCancelledError(RuntimeError):
+    """Raised immediately when the user cancels an active exam generation job."""
+
+
+def check_cancelled(cancel_event: threading.Event | None) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise JobCancelledError("Job cancelled by user")
+
 # Runtime overrides set from the dashboard UI (kept in-process; never logged)
 RUNTIME_API_KEYS: dict[str, str] = {}
 
@@ -515,20 +524,34 @@ def _post_with_retry(
     payload: dict,
     timeout_seconds: float,
     max_retries: int = 2,
+    cancel_event: threading.Event | None = None,
 ) -> requests.Response:
     last_exc: Exception | None = None
     for attempt in range(max_retries + 1):
+        check_cancelled(cancel_event)
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=timeout_seconds)
             if resp.status_code in (429, 500, 502, 503, 504) and attempt < max_retries:
-                time.sleep(1.5 * (2**attempt))
+                wait_s = 1.5 * (2**attempt)
+                if cancel_event is not None:
+                    if cancel_event.wait(wait_s):
+                        raise JobCancelledError("Job cancelled by user")
+                else:
+                    time.sleep(wait_s)
                 continue
             resp.raise_for_status()
             return resp
+        except JobCancelledError:
+            raise
         except requests.RequestException as exc:
             last_exc = exc
             if attempt < max_retries:
-                time.sleep(1.5 * (2**attempt))
+                wait_s = 1.5 * (2**attempt)
+                if cancel_event is not None:
+                    if cancel_event.wait(wait_s):
+                        raise JobCancelledError("Job cancelled by user")
+                else:
+                    time.sleep(wait_s)
                 continue
             raise
     raise RuntimeError(f"HTTP request failed: {last_exc}")
@@ -542,8 +565,10 @@ def generate_structured_json(
     temperature: float = 0.35,
     timeout_seconds: float = 40.0,
     thinking_budget: int = 128,
+    cancel_event: threading.Event | None = None,
 ) -> T:
     """Generate and validate a Pydantic-structured response from any configured provider."""
+    check_cancelled(cancel_event)
     if provider == "gemini":
         api_key = get_api_key("gemini")
         if not api_key:
@@ -557,7 +582,9 @@ def generate_structured_json(
         # adaptive pacing + Retry-After backoff for RPM/TPM 429s, and instant fast-fail on daily RPD exhaustion.
         global _GEMINI_PACE_SECONDS
         for attempt in range(3):
+            check_cancelled(cancel_event)
             _pace_dispatch(_GEMINI_PACE_SECONDS)
+            check_cancelled(cancel_event)
             set_ai_activity(
                 "working",
                 f"ส่งคำขอไปที่ Gemini ({model})",
@@ -590,8 +617,11 @@ def generate_structured_json(
                         )
                     else:
                         raise
+                check_cancelled(cancel_event)
                 record_request_usage("gemini", model)
                 return schema_cls.model_validate_json(resp.text)
+            except JobCancelledError:
+                raise
             except Exception as exc:
                 msg = str(exc)
                 if any(tok in msg for tok in transient_tokens):
@@ -617,7 +647,11 @@ def generate_structured_json(
                             f"waiting {wait_s:.1f}s before retry...",
                             flush=True,
                         )
-                        time.sleep(wait_s)
+                        if cancel_event is not None:
+                            if cancel_event.wait(wait_s):
+                                raise JobCancelledError("Job cancelled by user")
+                        else:
+                            time.sleep(wait_s)
                         continue
                     if "429" in msg:
                         record_quota_exhausted("gemini", model, msg, is_daily=False)
@@ -650,6 +684,7 @@ def generate_structured_json(
             },
             payload=build_openai_payload(model, json_prompt, temperature),
             timeout_seconds=timeout_seconds,
+            cancel_event=cancel_event,
         )
         content = resp.json()["choices"][0]["message"]["content"]
         return schema_cls.model_validate_json(_extract_json_block(content))
@@ -672,6 +707,7 @@ def generate_structured_json(
                 "messages": [{"role": "user", "content": json_prompt}],
             },
             timeout_seconds=timeout_seconds,
+            cancel_event=cancel_event,
         )
         content = resp.json()["content"][0]["text"]
         return schema_cls.model_validate_json(_extract_json_block(content))
@@ -680,9 +716,10 @@ def generate_structured_json(
         base_url = (get_api_key("ollama") or "http://localhost:11434").rstrip("/")
         payload: dict = {
             "model": model,
-            "stream": False,
+            "stream": True,
             "format": "json",
-            "options": {"temperature": temperature, "num_predict": 2500},
+            "keep_alive": "10m",
+            "options": {"temperature": temperature, "num_predict": 1400},
             "messages": [{"role": "user", "content": json_prompt}],
         }
         if any(k in model.lower() for k in ("qwen3", "deepseek", "glm", "r1")):
@@ -691,25 +728,45 @@ def generate_structured_json(
         set_ai_activity(
             "working",
             f"ส่งคำขอไปที่ Local Ollama ({model})",
-            "กำลังประมวลผลบนเครื่อง (รอ JSON + โค้ด SymPy)...",
+            "กำลังประมวลผลบนเครื่อง (สตรีม JSON + โค้ด SymPy)...",
         )
-        resp = requests.post(
-            f"{base_url}/api/chat",
-            headers={"Content-Type": "application/json"},
-            json=payload,
-            timeout=max(180.0, timeout_seconds * 3),
-        )
-        if resp.status_code >= 400 and "think" in payload:
-            payload.pop("think", None)
-            resp = requests.post(
+
+        def _stream_ollama(req_payload: dict) -> tuple[int, str]:
+            check_cancelled(cancel_event)
+            with requests.post(
                 f"{base_url}/api/chat",
                 headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=max(180.0, timeout_seconds * 3),
-            )
-        if not resp.ok:
-            raise RuntimeError(f"Ollama error ({resp.status_code}): {resp.text[:300]}")
-        content = resp.json()["message"]["content"]
+                json=req_payload,
+                timeout=(10.0, 60.0),
+                stream=True,
+            ) as resp:
+                if not resp.ok:
+                    return resp.status_code, resp.text[:300]
+                chunks: list[str] = []
+                for raw_line in resp.iter_lines(decode_unicode=True):
+                    if cancel_event is not None and cancel_event.is_set():
+                        resp.close()
+                        raise JobCancelledError("Job cancelled by user")
+                    if not raw_line:
+                        continue
+                    try:
+                        obj = json.loads(raw_line)
+                    except Exception:
+                        continue
+                    msg_part = (obj.get("message") or {}).get("content", "")
+                    if msg_part:
+                        chunks.append(msg_part)
+                    if obj.get("done"):
+                        break
+                return 200, "".join(chunks)
+
+        status_code, content = _stream_ollama(payload)
+        if status_code >= 400 and "think" in payload:
+            payload.pop("think", None)
+            status_code, content = _stream_ollama(payload)
+        if status_code >= 400:
+            raise RuntimeError(f"Ollama error ({status_code}): {content}")
+        check_cancelled(cancel_event)
         return schema_cls.model_validate_json(_extract_json_block(content))
 
     raise ValueError(f"Unsupported provider: {provider}")

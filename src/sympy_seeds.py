@@ -6,7 +6,9 @@ BEFORE the LLM writes the Thai word problem.
 
 from __future__ import annotations
 
+import math
 import random
+import re
 from dataclasses import dataclass
 
 import sympy as sp
@@ -389,3 +391,154 @@ def generate_verified_seed(chapter_id: str, seed: int | None = None) -> MathSeed
         return None
     rng = random.Random(seed)
     return fn(rng)
+
+
+_NON_NEGATIVE_CHAPTERS = {"sets", "logic", "counting", "probability", "prob_distributions"}
+
+
+def _format_clean_number(val: float, is_int: bool) -> str:
+    if is_int or abs(val - round(val)) < 1e-9:
+        return str(int(round(val)))
+    return f"{val:.4f}".rstrip("0").rstrip(".")
+
+
+def build_deterministic_mcq_choices(
+    exact_answer: str,
+    chapter_id: str,
+    rng: random.Random | None = None,
+) -> tuple[list[str], str]:
+    """Deterministically build 5 mathematically distinct MCQ choices and exact 1-based answer index.
+
+    Guarantees 100% alignment between `sympy_code` / `exact_answer`, `choices_latex`, and `answer`.
+    """
+    r = rng or random.Random()
+    if chapter_id == "logic":
+        ans_int = int(round(float(sp.N(sp.sympify(exact_answer)))))
+        if 0 <= ans_int <= 4:
+            return ["0", "1", "2", "3", "4"], str(ans_int + 1)
+
+    ans_val = float(sp.N(sp.sympify(exact_answer)))
+    is_int = abs(ans_val - round(ans_val)) < 1e-9
+    non_neg = chapter_id in _NON_NEGATIVE_CHAPTERS
+    is_prob = chapter_id in {"probability", "prob_distributions"} and 0.0 <= ans_val <= 1.0
+
+    distractors: list[float] = []
+    seen = [ans_val]
+
+    def _try_add(cand: float) -> None:
+        if not math.isfinite(cand):
+            return
+        if is_prob and not (0.0 < cand < 1.0):
+            return
+        if non_neg and cand < 0:
+            return
+        if any(math.isclose(cand, s, rel_tol=1e-4, abs_tol=1e-4) for s in seen):
+            return
+        seen.append(cand)
+        distractors.append(cand)
+
+    if is_prob:
+        offsets = [-0.2, -0.1, -0.05, 0.05, 0.1, 0.15, 0.2, 0.25, -0.15, 0.3]
+        r.shuffle(offsets)
+        for off in offsets:
+            _try_add(round(ans_val + off, 4))
+            if len(distractors) == 4:
+                break
+        step = 0.02
+        while len(distractors) < 4:
+            _try_add(round(min(0.98, max(0.02, ans_val + step)), 4))
+            step = -step if step > 0 else abs(step) + 0.03
+    elif is_int:
+        ans_i = int(round(ans_val))
+        mag = max(1, abs(ans_i))
+        step = 1 if mag < 20 else (2 if mag < 60 else (5 if mag < 200 else max(10, round(mag * 0.05 / 5) * 5)))
+        raw_cands = [
+            ans_i - 2 * step,
+            ans_i - step,
+            ans_i + step,
+            ans_i + 2 * step,
+            -ans_i,
+            ans_i + 3 * step,
+            ans_i - 3 * step,
+            ans_i + 4 * step,
+            ans_i + 5 * step,
+        ]
+        r.shuffle(raw_cands)
+        for c in raw_cands:
+            _try_add(float(c))
+            if len(distractors) == 4:
+                break
+        k = 1
+        while len(distractors) < 4:
+            _try_add(float(ans_i + k * step))
+            k += 1
+    else:
+        step = 0.5 if abs(ans_val) < 10 else max(1.0, round(abs(ans_val) * 0.1, 1))
+        raw_cands = [
+            ans_val - 2 * step,
+            ans_val - step,
+            ans_val + step,
+            ans_val + 2 * step,
+            -ans_val,
+            ans_val + 3 * step,
+        ]
+        r.shuffle(raw_cands)
+        for c in raw_cands:
+            _try_add(round(c, 4))
+            if len(distractors) == 4:
+                break
+        k = 1
+        while len(distractors) < 4:
+            _try_add(round(ans_val + k * step, 4))
+            k += 1
+
+    # Keep exact_answer string verbatim for the true choice, format distractors cleanly
+    pairs = [(ans_val, exact_answer.strip())] + [
+        (d, _format_clean_number(d, is_int)) for d in distractors[:4]
+    ]
+    pairs.sort(key=lambda p: p[0])
+    choices = [p[1] for p in pairs]
+    correct_idx = next(
+        idx for idx, (v, _) in enumerate(pairs, start=1)
+        if math.isclose(v, ans_val, rel_tol=1e-4, abs_tol=1e-4)
+    )
+    return choices, str(correct_idx)
+
+
+def verify_seed_numbers_in_stem(seed_obj: MathSeed, stem_latex: str) -> tuple[bool, str | None]:
+    """Ensure the LLM did not alter the core numerical parameters from `seed_obj` in `stem_latex`."""
+    # Strip the trailing "(คำตอบแน่นอน = ...)" / "(ใช้ตัวเลือก ...)" hint before extracting premise numbers
+    premise = re.split(r"\(คำตอบแน่นอน|\(ใช้ตัวเลือก", seed_obj.params_description_th)[0]
+    raw_nums = re.findall(r"(?<![A-Za-z_])(\d+(?:\.\d+)?)", premise)
+    # Deduplicate while preserving order; ignore tiny structural counts like "3 อย่าง", "4 ข้อ"
+    distinct_nums: list[str] = []
+    for n in raw_nums:
+        if n not in distinct_nums:
+            distinct_nums.append(n)
+    if not distinct_nums:
+        return True, None
+
+    norm_stem = stem_latex.replace(",", "").replace("{", "").replace("}", "").replace("$", "")
+    missing: list[str] = []
+    large_missing: list[str] = []
+    for n in distinct_nums:
+        if n not in norm_stem:
+            missing.append(n)
+            try:
+                if float(n) >= 10:
+                    large_missing.append(n)
+            except ValueError:
+                pass
+
+    if large_missing:
+        return (
+            False,
+            f"Stem omitted/altered seed parameter(s): {', '.join(large_missing[:4])}",
+        )
+    hit_ratio = (len(distinct_nums) - len(missing)) / len(distinct_nums)
+    if hit_ratio < 0.70:
+        return (
+            False,
+            f"Stem diverged from seed numbers (missing: {', '.join(missing[:4])})",
+        )
+    return True, None
