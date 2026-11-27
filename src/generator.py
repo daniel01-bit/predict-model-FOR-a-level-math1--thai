@@ -12,6 +12,7 @@ from typing import Callable, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 
+from src.dedup import GLOBAL_STEM_REGISTRY
 from src.diversity import format_few_shot_block, sample_diversity_directive
 from src.llm_router import (
     JobCancelledError,
@@ -33,10 +34,61 @@ from src.sympy_seeds import (
     generate_verified_seed,
     verify_seed_numbers_in_stem,
 )
-from src.verifier import sanitize_choice_text, sanitize_latex_text, verify_generated_question
+from src.verifier import (
+    sanitize_choice_text,
+    sanitize_latex_text,
+    sort_mcq_choices_ascending,
+    verify_generated_question,
+)
 
 
 GenerationMode = Literal["question", "mini_test", "mock_test"]
+_STYLE_GUIDE_PATH = Path(__file__).resolve().parent.parent / "config" / "exam_style_guide.json"
+_STYLE_GUIDE_CACHE: dict | None = None
+
+
+def load_exam_style_guide() -> dict:
+    """Load the compact IPST A-Level 61 exam style guide JSON (cached in-process)."""
+    global _STYLE_GUIDE_CACHE
+    if _STYLE_GUIDE_CACHE is None:
+        if _STYLE_GUIDE_PATH.exists():
+            _STYLE_GUIDE_CACHE = json.loads(_STYLE_GUIDE_PATH.read_text(encoding="utf-8"))
+        else:
+            _STYLE_GUIDE_CACHE = {}
+    return _STYLE_GUIDE_CACHE
+
+
+def _style_guide_prompt_block(question_format: QuestionFormat) -> str:
+    guide = load_exam_style_guide()
+    if not guide:
+        return ""
+    rules = list(guide.get("common_rules_th", []))
+    if question_format == QuestionFormat.MCQ_5:
+        rules.extend(guide.get("mcq_5_rules_th", []))
+    else:
+        rules.extend(guide.get("numeric_rules_th", []))
+    if not rules:
+        return ""
+    return "\nมาตรฐาน Format ข้อสอบ สสวท. (Exam Style Guide):\n" + "\n".join(
+        f"- {r}" for r in rules
+    )
+
+
+def _pick_seed_for_slot(chapter_id: str, question_format: QuestionFormat):
+    """Pick a SymPy-First seed respecting A-Level 61 numeric bubble-sheet bounds [0, 9999.99]."""
+    import sympy as sp
+
+    for _ in range(8):
+        s = generate_verified_seed(chapter_id)
+        if s is None or question_format == QuestionFormat.MCQ_5:
+            return s
+        try:
+            val = float(sp.N(sp.sympify(s.exact_answer)))
+            if 0.0 <= val <= 9999.99:
+                return s
+        except Exception:
+            continue
+    return None
 
 
 class LogicAuditItem(BaseModel):
@@ -247,7 +299,7 @@ def generate_verified_slot(
     check_cancelled(cancel_event)
     effective_retries = min(max_retries, 2) if provider == "ollama" else max_retries
     ctx = _lookup_curriculum_context(slot.chapter_id, slot.sub_skill_id)
-    seed_obj = generate_verified_seed(slot.chapter_id)
+    seed_obj = _pick_seed_for_slot(slot.chapter_id, slot.question_format)
     _, diversity_hint = sample_diversity_directive(slot.chapter_id, used_archetypes=used_archetypes)
     few_shot_block = format_few_shot_block(slot.chapter_id, k=1)
     locked_choices: list[str] | None = None
@@ -309,6 +361,7 @@ def generate_verified_slot(
 5. เลือกใช้ตัวเลขในโจทย์ที่ **คิดเลขลงตัวและไม่ซับซ้อนเกินไป** เพื่อให้คำตอบของ `sympy_code`, `choices_latex`, และ `solution_steps_th` ตรงกันเป๊ะ 100% — **ห้ามแอบแก้ไขตัวเลขโจทย์หรือเขียนว่า "ปรับโจทย์/ปรับเวกเตอร์/ขออภัย" ใน `solution_steps_th` เด็ดขาด!**
 6. ประเมินระดับความยากเป็น `difficulty_stars` ตั้งแต่ 1 ถึง 5 ดาว (1=พื้นฐานมาก, 2=ค่อนข้างง่าย, 3=มาตรฐาน A-Level, 4=ยาก/บูรณาการ, 5=ยากมาก/คัดแยกคะแนน)
 7. ในฟิลด์ `sympy_code` ต้องเขียนโค้ด Python ที่ใช้ `sp` (sympy) คำนวณหาคำตอบจริงจากเงื่อนไขโจทย์ + ใส่ `assert` ครบ 4 ด้าน: (ก) กรองโดเมนแล้ว `assert len(valid_sols) == 1` (ข) แก้ทุกเงื่อนไขเป็นระบบสมการเดียวกันแล้ว `assert` ว่าไม่ขัดแย้งกัน (ค) `assert` นิยามคณิตศาสตร์ (เช่น ลิมิตซ้าย=ขวา=f(c), det!=0) (ง) `assert len(ANSWER.free_symbols) == 0` ห้ามติดตัวแปรอิสระ (ห้าม hardcode `ANSWER = ...` และห้ามใส่หมายเลขตัวเลือก 1–5 ลงใน `ANSWER`)
+{_style_guide_prompt_block(slot.question_format)}
 """
 
     last_error = ""
@@ -399,6 +452,7 @@ def generate_verified_slot(
             historical_stems=historical_stems,
             solution_steps_th=draft.solution_steps_th,
             chapter_id=slot.chapter_id,
+            check_generated_history=True,
         )
         if ver.passed:
             # Skip redundant LLM Logic Audit on Local Ollama (SymPy + 5 Global Gates already enforce correctness)
@@ -414,6 +468,7 @@ def generate_verified_slot(
             else:
                 is_logical, logic_issue = True, ""
             if is_logical:
+                GLOBAL_STEM_REGISTRY.register(draft.stem_latex, slot.chapter_id, slot.sub_skill_id)
                 print(
                     f"[gen] slot={slot.slot_number} PASSED SymPy{' + Logic Audit' if needs_llm_audit else ' (SymPy-First Fast Gate)'} (ans={ver.computed_answer}, stars={draft.difficulty_stars})",
                     flush=True,
@@ -515,6 +570,13 @@ class GeneratedBatchDraft(BaseModel):
 
 
 def _format_verified_item(slot: ExamSlot, ctx: dict, draft: GeneratedQuestionDraft, ver) -> dict:
+    payload = draft.model_dump()
+    if slot.question_format == QuestionFormat.MCQ_5 and payload.get("choices_latex"):
+        sorted_choices, remapped_ans = sort_mcq_choices_ascending(
+            payload["choices_latex"], str(payload["answer"])
+        )
+        payload["choices_latex"] = sorted_choices
+        payload["answer"] = remapped_ans
     return {
         "slot_number": slot.slot_number,
         "strand_id": slot.strand_id,
@@ -527,7 +589,7 @@ def _format_verified_item(slot: ExamSlot, ctx: dict, draft: GeneratedQuestionDra
         "verified_sympy": True,
         "sympy_computed_answer": ver.computed_answer,
         "max_stem_similarity": ver.max_stem_similarity,
-        **draft.model_dump(),
+        **payload,
     }
 
 
@@ -605,6 +667,7 @@ def generate_verified_batch(
             "เช็กคำตอบจริง + โดเมน + 5 ตัวเลือกไม่ซ้ำ + LaTeX",
         )
         sympy_passed: list[tuple[ExamSlot, GeneratedQuestionDraft, object]] = []
+        batch_seen_stems: list[str] = []
         for slot, raw_draft in zip(batch_slots, batch_draft.items):
             draft = _sanitize_draft(raw_draft)
             ver = verify_generated_question(
@@ -616,8 +679,11 @@ def generate_verified_batch(
                 historical_stems=historical_stems,
                 solution_steps_th=draft.solution_steps_th,
                 chapter_id=slot.chapter_id,
+                session_stems=batch_seen_stems,
+                check_generated_history=True,
             )
             if ver.passed:
+                batch_seen_stems.append(draft.stem_latex)
                 sympy_passed.append((slot, draft, ver))
             else:
                 print(
@@ -631,6 +697,7 @@ def generate_verified_batch(
         audit_candidates: list[tuple[ExamSlot, GeneratedQuestionDraft, object]] = []
         for slot, draft, ver in sympy_passed:
             if slot.slot_number in seeded_slots:
+                GLOBAL_STEM_REGISTRY.register(draft.stem_latex, slot.chapter_id, slot.sub_skill_id)
                 verified_by_slot[slot.slot_number] = _format_verified_item(
                     slot, ctxs[slot.slot_number], draft, ver
                 )
@@ -647,6 +714,7 @@ def generate_verified_batch(
             for slot, draft, ver in audit_candidates:
                 ok_logic, issue = audit_map.get(slot.slot_number, (True, ""))
                 if ok_logic:
+                    GLOBAL_STEM_REGISTRY.register(draft.stem_latex, slot.chapter_id, slot.sub_skill_id)
                     verified_by_slot[slot.slot_number] = _format_verified_item(
                         slot, ctxs[slot.slot_number], draft, ver
                     )

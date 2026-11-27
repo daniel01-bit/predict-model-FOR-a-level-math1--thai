@@ -336,6 +336,50 @@ def test_quota_gauge_auto_resets_when_reset_window_expires():
             llm_router._save_quota_state_unlocked()
 
 
+def test_exam_style_guide_numeric_bounds_and_mcq_ascending_sort():
+    from src.generator import load_exam_style_guide
+    from src.verifier import sort_mcq_choices_ascending, verify_generated_question
+
+    guide = load_exam_style_guide()
+    assert guide.get("numeric_bounds") == {"min": 0.0, "max": 9999.99}
+    assert len(guide.get("mcq_5_rules_th", [])) >= 2
+    assert len(guide.get("numeric_rules_th", [])) >= 2
+
+    # MCQ ascending auto-sort remaps answer index cleanly
+    choices = ["12", r"$\frac{1}{2}$", "-3", "4", "0"]
+    sorted_c, new_ans = sort_mcq_choices_ascending(choices, "2")  # old #2 is 1/2 -> new #3
+    assert sorted_c == ["-3", "0", r"$\frac{1}{2}$", "4", "12"]
+    assert new_ans == "3"
+
+    # A-Level 61 NUMERIC bubble sheet rejects negative and > 9999.99
+    ver_neg = verify_generated_question(
+        stem_latex="กำหนดสมการ $x + 5 = 1$ จงหาค่า $x$",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="-4",
+        sympy_code="x = sp.Symbol('x')\nANSWER = sp.solve(sp.Eq(x + 5, 1), x)[0]",
+    )
+    assert not ver_neg.passed and "negative" in (ver_neg.error or "").lower()
+
+    ver_high = verify_generated_question(
+        stem_latex="กำหนดสมการ $x = 15000$ จงหาค่า $x$",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="15000",
+        sympy_code="x = sp.Symbol('x')\nANSWER = sp.solve(sp.Eq(x - 15000, 0), x)[0]",
+    )
+    assert not ver_high.passed and "9999.99" in (ver_high.error or "")
+
+    ver_ok = verify_generated_question(
+        stem_latex="กำหนดสมการ $2x - 7 = 0$ จงหาค่า $x$ (ตอบเป็นทศนิยม 2 ตำแหน่ง)",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="3.50",
+        sympy_code="x = sp.Symbol('x')\nANSWER = sp.solve(sp.Eq(2*x - 7, 0), x)[0]",
+    )
+    assert ver_ok.passed
+
+
 def test_llm_router_circuit_breaker_and_provider_guards():
     from src.llm_router import _is_daily_quota_exhausted, _parse_retry_after_seconds
 
@@ -357,6 +401,14 @@ def test_llm_router_circuit_breaker_and_provider_guards():
     assert wrapped_eq == r"วงรีมีสมการ $\frac{(x - 4)^2}{169} + \frac{(y + 1)^2}{144} = 1$ จุดใดๆ"
     assert _auto_wrap_bare_latex(r"\infty", is_choice=True) == r"$\infty$"
     assert _auto_wrap_bare_latex(r"ค่าของ $x = \frac{1}{2}$ คือ \infty") == r"ค่าของ $x = \frac{1}{2}$ คือ $\infty$"
+
+    # Bare \text{...} outside $...$ (like Q6-Q10) must be unwrapped cleanly without broken braces
+    q6_raw = r"\text{กำหนดให้ } A \text{ และ } B \text{ เป็นเมทริกซ์จัตุรัสขนาด } 3 \times 3 \text{ โดยที่ } \det(A) = -6 \text{ จงหาค่าของ } \det(3A^2B^{-1})"
+    q6_clean = _auto_wrap_bare_latex(q6_raw)
+    assert r"\text{" not in q6_clean
+    assert r"$3 \times 3$" in q6_clean
+    assert r"$\det(3A^2B^{-1})$" in q6_clean
+    assert q6_clean.count("$") % 2 == 0
     assert _is_daily_quota_exhausted("GenerateRequestsPerDayPerProjectPerModel-FreeTier") is True
     assert _is_daily_quota_exhausted("Generate content requests per day limit exceeded on Free Tier. Please retry in 2h40m58s.") is True
     assert _is_daily_quota_exhausted("GenerateRequestsPerMinutePerProjectPerModel-FreeTier") is False

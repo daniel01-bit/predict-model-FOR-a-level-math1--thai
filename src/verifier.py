@@ -535,6 +535,20 @@ def sanitize_choice_text(choice: str) -> str:
     return cleaned.strip()
 
 
+def sort_mcq_choices_ascending(choices_latex: list[str], answer: str) -> tuple[list[str], str]:
+    """Sort 5 MCQ choices in ascending numeric order (IPST A-Level 61 standard) and remap 1-based answer index."""
+    if len(choices_latex) != 5 or answer not in {"1", "2", "3", "4", "5"}:
+        return choices_latex, answer
+    parsed = [_parse_numeric(c) for c in choices_latex]
+    if any(v is None for v in parsed):
+        return choices_latex, answer
+    old_idx = int(answer) - 1
+    indexed = sorted(enumerate(zip(parsed, choices_latex)), key=lambda item: item[1][0])  # type: ignore[arg-type,return-value]
+    new_choices = [ch for _, (_, ch) in indexed]
+    new_ans = next(str(pos) for pos, (orig_i, _) in enumerate(indexed, start=1) if orig_i == old_idx)
+    return new_choices, new_ans
+
+
 def check_latex_and_choice_quality(
     stem_latex: str,
     question_format: QuestionFormat,
@@ -605,6 +619,8 @@ def verify_generated_question(
     max_allowed_similarity: float = 0.65,
     solution_steps_th: str = "",
     chapter_id: str | None = None,
+    session_stems: list[str] | None = None,
+    check_generated_history: bool = False,
 ) -> VerificationResult:
     """Verify mathematical correctness via SymPy + LaTeX quality + uniqueness + non-duplication."""
     quality_err = check_latex_and_choice_quality(
@@ -645,6 +661,22 @@ def verify_generated_question(
             max_stem_similarity=round(max_sim, 4),
             error=f"Stem too similar to historical exam (Jaccard={max_sim:.2f} >= {max_allowed_similarity})",
         )
+
+    if session_stems or check_generated_history:
+        from src.dedup import GLOBAL_STEM_REGISTRY
+
+        dup_err = GLOBAL_STEM_REGISTRY.check_duplicate(
+            stem_latex=stem_latex,
+            session_stems=session_stems,
+        )
+        if dup_err:
+            return VerificationResult(
+                passed=False,
+                computed_answer=None,
+                expected_answer=expected_answer,
+                max_stem_similarity=round(max_sim, 4),
+                error=f"Duplicate blocked: {dup_err}",
+            )
 
     ok, computed = run_sympy_code(sympy_code)
     if not ok:
