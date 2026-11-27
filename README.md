@@ -74,7 +74,7 @@ Evaluated chronologically on real **A-Level Math 1 (2568 & 2569)** exams (`224` 
 
 This project was built through **human-led product & architecture engineering** paired with an **AI coding assistant** for implementation acceleration:
 
-| Area | What the Human Did (Daniel) | What the AI Did (AI Coding Assistant) |
+| Area | What the Human Did (Creator) | What the AI Did (AI Coding Assistant) |
 | :--- | :--- | :--- |
 | **Problem Framing & Domain Strategy** | Identified the real pain points (LLM math contradictions, syllabus drift in Thai A-Level Math 1), proposed the **3-Tier Weighted Multi-Source** modeling approach, and set the strict zero-leakage walk-forward backtest requirement. | Formalized the rules into Pydantic schemas (`src/schema.py`), closed 51-sub-skill taxonomy JSON (`config/syllabus_2560.json`), and implemented the scoring/decay math (`src/model.py`, `src/backtest.py`). |
 | **Architecture & Technical Decisions** | Rejected LLM fine-tuning (Small-N memorization risk), mandated **SymPy-First + Dual Verification**, selected FastAPI + Headless Chromium PDF over Streamlit/ReportLab, chose **Option A + C** (pipeline concurrency + verified question pool), and directed every UX iteration (3-mode studio, olive-green dark theme, filtered API dropdown, spinning $\pi$ loader, one-click `run_dashboard.bat`). | Implemented the modular Python backend (`llm_router.py`, `sympy_seeds.py`, `verifier.py`, `question_pool.py`, `generator.py`, `pdf_renderer.py`, `server.py`), frontend (`web/index.html`), and Windows launcher (`run_dashboard.bat`). |
@@ -141,7 +141,7 @@ For local execution, `src/verifier.py` isolates LLM-generated SymPy code in a de
 
 โปรเจกต์นี้พัฒนาโดยให้ **มนุษย์เป็นคนคุมโจทย์ สถาปัตยกรรม และการตรวจคุณภาพจริง** และใช้ **AI Coding Assistant เป็นผู้ช่วยลงมือเขียนโค้ดและเร่งความเร็วในการพัฒนา**:
 
-| ด้าน | สิ่งที่คนทำ (Daniel) | สิ่งที่ AI ทำ (AI Coding Assistant) |
+| ด้าน | สิ่งที่คนทำ (ผู้สร้าง) | สิ่งที่ AI ทำ (AI Coding Assistant) |
 | :--- | :--- | :--- |
 | **การตั้งโจทย์และออกแบบโมเดลข้อมูล** | มองเห็นปัญหาจริงของ AI ออกข้อสอบคณิต (โจทย์ขัดแย้ง/คิดเลขผิด/หลุดหลักสูตร สสวท. 2560), วางสมมติฐานโมเดล **3-Tier Weighted Multi-Source**, และบังคับกติกา Zero-Leakage Walk-Forward Backtest | แปลงกติกาเป็น Pydantic Schema (`src/schema.py`), โครงสร้าง Taxonomy 51 ทักษะย่อย (`config/syllabus_2560.json`), และโค้ดคำนวณความน่าจะเป็น/Backtest (`src/model.py`, `src/backtest.py`) |
 | **การตัดสินใจด้านสถาปัตยกรรมและ UX** | ฟันธงไม่ทำ Fine-Tuning (กันโมเดลจำข้อสอบเก่า), บังคับใช้ **SymPy-First + ด่านตรวจ 2 ชั้น**, เลือก FastAPI + Headless PDF แทน Streamlit/ReportLab, ตัดสินใจเลือก **Option A + C** (Concurrency + คลังโจทย์สำรอง), และสั่งออกแบบ UI/UX ทุกจุด (ธีม Dark เขียวมะกอก, แสดงเฉพาะ AI ที่เชื่อม API, วงแหวนตัวเลข $\pi$ ตอนโหลด, ปุ่ม `run_dashboard.bat`) | เขียนโมดูล Backend ทั้งหมด (`llm_router.py`, `sympy_seeds.py`, `verifier.py`, `question_pool.py`, `generator.py`, `pdf_renderer.py`, `server.py`), หน้าเว็บ `web/index.html`, และสคริปต์รันคลิกเดียว `run_dashboard.bat` |
