@@ -15,10 +15,32 @@ from src.schema import QuestionFormat
 
 
 _WORKER_SCRIPT = r"""
-import fractions, itertools, json, math, sys
+import ast, fractions, itertools, json, math, sys
 import sympy as sp
 
 ALLOWED_MODULES = {"sympy", "math", "itertools", "fractions", "statistics", "decimal"}
+FORBIDDEN_NAMES = {
+    "__builtins__", "__import__", "__loader__", "__spec__", "__file__",
+    "eval", "exec", "compile", "open", "getattr", "setattr", "delattr",
+    "globals", "locals", "vars", "breakpoint", "input", "type", "object",
+}
+
+def _validate_ast(code: str) -> None:
+    tree = ast.parse(code, mode="exec")
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+            raise ValueError(f"Forbidden dunder attribute access: {node.attr}")
+        if isinstance(node, ast.Name) and (node.id in FORBIDDEN_NAMES or node.id.startswith("__")):
+            raise ValueError(f"Forbidden identifier in SymPy sandbox: {node.id}")
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                root = alias.name.split(".")[0]
+                if root not in ALLOWED_MODULES:
+                    raise ImportError(f"Module '{alias.name}' is not allowed in SymPy sandbox")
+        if isinstance(node, ast.ImportFrom):
+            root = (node.module or "").split(".")[0]
+            if root not in ALLOWED_MODULES:
+                raise ImportError(f"Module '{node.module}' is not allowed in SymPy sandbox")
 
 def _safe_import(name, globals=None, locals=None, fromlist=(), level=0):
     root = name.split(".")[0]
@@ -44,6 +66,7 @@ for raw in sys.stdin:
     try:
         req = json.loads(raw)
         code = req["code"]
+        _validate_ast(code)
         ns = {
             "__builtins__": SAFE_BUILTINS,
             "sp": sp,
