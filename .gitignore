@@ -1,0 +1,25 @@
+# Secrets & local environment
+.env
+.env.local
+
+# Python & test artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Raw third-party exam PDFs & parsed exam stems (keep curriculum & aggregate reports only)
+data/raw/
+data/parsed/
+data/pool/
+data/verified_pool.jsonl
+data/reports/jobs/
+data/reports/quota_usage.json
+
+# Local review / scratch exports
+review_bundle.txt
+*.log
+.DS_Store
+Thumbs.db

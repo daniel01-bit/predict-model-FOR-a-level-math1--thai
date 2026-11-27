@@ -1,0 +1,506 @@
+{
+  "curriculum_id": "IPST_2560_MATH_HIGH_SCHOOL",
+  "title_th": "หลักสูตรแกนกลางการศึกษาขั้นพื้นฐาน พ.ศ. 2551 (ฉบับปรับปรุง พ.ศ. 2560) กลุ่มสาระการเรียนรู้คณิตศาสตร์ ม.4-ม.6 (สสวท.)",
+  "exam_alignment": "TCAS A-Level คณิตศาสตร์ประยุกต์ 1 (Math 1)",
+  "courses": {
+    "core_math": [
+      { "grade": "M4", "chapters": ["sets", "logic", "counting", "probability"] },
+      { "grade": "M5", "chapters": ["expo_log", "functions", "sequences_series"] },
+      { "grade": "M6", "chapters": ["statistics"] }
+    ],
+    "additional_math": [
+      { "grade": "M4_T1", "chapters": ["sets", "logic", "real_numbers"] },
+      { "grade": "M4_T2", "chapters": ["functions", "expo_log", "analytic_geometry"] },
+      { "grade": "M5_T1", "chapters": ["trigonometry", "matrices", "vectors_3d"] },
+      { "grade": "M5_T2", "chapters": ["complex_numbers", "counting", "probability"] },
+      { "grade": "M6_T1", "chapters": ["sequences_series", "calculus"] },
+      { "grade": "M6_T2", "chapters": ["prob_distributions"] }
+    ]
+  },
+  "chapters": [
+    {
+      "chapter_id": "sets",
+      "strand_id": "number_algebra",
+      "name_th": "เซต",
+      "grade_level": "M4",
+      "learning_outcomes": [
+        "เข้าใจและใช้ความรู้เกี่ยวกับเซตในการสื่อสารและสื่อความหมายทางคณิตศาสตร์",
+        "ใช้แผนภาพเวนน์และการดำเนินการของเซตแก้ปัญหาโจทย์สถานการณ์จริง"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "set_operations_venn",
+          "topics_th": ["ยูเนียน", "อินเตอร์เซกชัน", "คอมพลีเมนต์", "ผลต่างของเซต", "กฎเดอมอร์แกน"],
+          "ipst_applied_contexts": ["การจัดกลุ่มสำรวจข้อมูล", "เงื่อนไขคัดเลือกสมาชิก 2-3 กลุ่ม"],
+          "classic_traps": ["ลืมหักส่วนซ้ำ 3 กลุ่ม", "สลับความหมาย A-B กับ B-A"]
+        },
+        {
+          "sub_skill_id": "power_set_subset",
+          "topics_th": ["สับเซต", "เพาเวอร์เซต", "จำนวนสมาชิกของเพาเวอร์เซต", "การเป็นสมาชิก vs สับเซต"],
+          "ipst_applied_contexts": ["นับจำนวนชุดย่อยที่สอดคล้องเงื่อนไขบังคับ"],
+          "classic_traps": ["สับสนระหว่าง {} กับ {{}}", "นับเซตว่างตกหล่น"]
+        },
+        {
+          "sub_skill_id": "cardinality_word_problem",
+          "topics_th": ["สูตรจำนวนสมาชิก n(A U B U C)", "ค่ามากสุด/น้อยสุดของ n(A intersect B)"],
+          "ipst_applied_contexts": ["โจทย์สำรวจลูกค้า/นักเรียน 3 ประเภทพร้อมเงื่อนไขอย่างน้อย/มากที่สุด"],
+          "classic_traps": ["ลืมเงื่อนไขจำนวนสมาชิกต้องไม่ติดลบและไม่เกินเอกภพสัมพัทธ์"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "logic",
+      "strand_id": "number_algebra",
+      "name_th": "ตรรกศาสตร์",
+      "grade_level": "M4",
+      "learning_outcomes": [
+        "ตรวจสอบสมมูล สัจนิรันดร์ และความสมเหตุสมผลของการอ้างเหตุผล",
+        "วิเคราะห์ค่าความจริงและนิเสธของประโยคที่มีตัวบ่งปริมาณ"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "truth_table_equivalence",
+          "topics_th": ["ตัวเชื่อมประพจน์", "สมมูล", "นิเสธของประโยคเงื่อนไข", "Contrapositive"],
+          "ipst_applied_contexts": ["แปลงเงื่อนไขกฎเกณฑ์หรือข้อความภาษาไทยเป็นประโยคสมมูล"],
+          "classic_traps": ["นิเสธของ p->q เป็น p->~q แทนที่จะเป็น p ^ ~q"]
+        },
+        {
+          "sub_skill_id": "tautology_validity",
+          "topics_th": ["สัจนิรันดร์", "การอ้างเหตุผลที่สมเหตุสมผล", "การพิสูจน์โดยหาข้อขัดแย้ง"],
+          "ipst_applied_contexts": ["สรุปผลจากเงื่อนไขหลายข้อในสถานการณ์สืบสวน/ตัดสินใจ"],
+          "classic_traps": ["อนุมานผิดรูป (Affirming the consequent)"]
+        },
+        {
+          "sub_skill_id": "quantifiers_negation",
+          "topics_th": ["ตัวบ่งปริมาณ forall, exists", "นิเสธประโยคตัวบ่งปริมาณ", "ค่าความจริงบนเอกภพสัมพัทธ์"],
+          "ipst_applied_contexts": ["ตรวจสอบข้อความคณิตศาสตร์จริง/เท็จบนเซตจำนวนจริงหรือจำนวนเต็ม"],
+          "classic_traps": ["ลืมเปลี่ยนโดเมนหรือขอบเขตเมื่อกระจายนิเสธเข้าตัวบ่งปริมาณ"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "real_numbers",
+      "strand_id": "number_algebra",
+      "name_th": "จำนวนจริงและพหุนาม",
+      "grade_level": "M4",
+      "learning_outcomes": [
+        "แยกตัวประกอบพหุนาม ใช้ทฤษฎีบทเศษเหลือและตัวประกอบ แก้สมการและอสมการเศษส่วนพหุนามและค่าสัมบูรณ์"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "polynomial_remainder_factor",
+          "topics_th": ["การหารพหุนาม", "ทฤษฎีบทเศษเหลือ", "ทฤษฎีบทตัวประกอบตรรกยะ", "ผลบวกและผลคูณราก"],
+          "ipst_applied_contexts": ["หาพหุนามจากเงื่อนไขเศษเหลือหรือจุดตัดแกน"],
+          "classic_traps": ["ลืมสัมประสิทธิ์นำ a ในการสร้างพหุนาม"]
+        },
+        {
+          "sub_skill_id": "rational_inequalities",
+          "topics_th": ["อสมการพหุนาม", "อสมการเศษส่วนพหุนาม", "เส้นจำนวนและรากซ้ำกำลังคู่"],
+          "ipst_applied_contexts": ["หาช่วงค่าตัวแปรที่ทำให้กำไร/ต้นทุนเป็นไปตามเงื่อนไข"],
+          "classic_traps": ["คูณไขว้ตัวส่วนโดยไม่รู้เครื่องหมาย", "ลืมตัดค่าที่ทำให้ส่วนเป็น 0"]
+        },
+        {
+          "sub_skill_id": "absolute_value_equations_inequalities",
+          "topics_th": ["สมการและอสมการค่าสัมบูรณ์", "สมบัติ |x| และอสมการสามเหลี่ยม"],
+          "ipst_applied_contexts": ["ช่วงความคลาดเคลื่อนของการผลิต (Tolerance)"],
+          "classic_traps": ["ลืมตรวจคำตอบเมื่อยกกำลังสองทั้งสองข้าง"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "functions",
+      "strand_id": "number_algebra",
+      "name_th": "ฟังก์ชัน",
+      "grade_level": "M4-M5",
+      "learning_outcomes": [
+        "เข้าใจฟังก์ชัน กราฟ โดเมน เรนจ์ ฟังก์ชันประกอบ ฟังก์ชันผกผัน และใช้ฟังก์ชันแบบขั้นบันได/กำลังสองแก้ปัญหา"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "domain_range_graph",
+          "topics_th": ["โดเมนและเรนจ์", "ฟังก์ชันเพิ่ม-ลด", "การเลื่อนกราฟ", "พาราโบลาค่าสูงสุดต่ำสุด"],
+          "ipst_applied_contexts": ["แบบจำลองรายได้-กำไรกำลังสอง", "อ่านค่าจากกราฟ"],
+          "classic_traps": ["หาจุดยอดนอกช่วงโดเมนที่โจทย์กำหนด"]
+        },
+        {
+          "sub_skill_id": "composite_inverse_function",
+          "topics_th": ["ฟังก์ชัน 1-1", "ฟังก์ชันผกผัน f^-1", "ฟังก์ชันประกอบ (f o g)(x)"],
+          "ipst_applied_contexts": ["การแปลงหน่วย/ส่วนลดซ้อนสองชั้น"],
+          "classic_traps": ["ลืมเช็กเงื่อนไขโดเมนของ f o g และสลับลำดับ f(g(x)) กับ g(f(x))"]
+        },
+        {
+          "sub_skill_id": "piecewise_applied_function",
+          "topics_th": ["ฟังก์ชันแบบแบ่งช่วง", "ฟังก์ชันขั้นบันได"],
+          "ipst_applied_contexts": ["อัตราค่าไฟ ค่าส่งพัสดุ ภาษีเงินได้แบบขั้นบันได"],
+          "classic_traps": ["คิดภาษี/ค่าบริการแบบเหมาอัตราเดียวแทนที่จะคิดทีละขั้น"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "expo_log",
+      "strand_id": "number_algebra",
+      "name_th": "ฟังก์ชันเอกซ์โพเนนเชียลและฟังก์ชันลอการิทึม",
+      "grade_level": "M4-M5",
+      "learning_outcomes": [
+        "แก้สมการและอสมการเอกซ์โพเนนเชียลและลอการิทึม และประยุกต์กับแบบจำลองการเติบโต/สลายตัว"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "expo_equations_inequalities",
+          "topics_th": ["สมบัติเลขยกกำลัง", "สมการเอกซ์โพเนนเชียล", "อสมการฐาน 0<a<1 vs a>1"],
+          "ipst_applied_contexts": ["การเพิ่มจำนวนแบคทีเรีย/การเสื่อมราคา"],
+          "classic_traps": ["ลืมกลับเครื่องหมายอสมการเมื่อฐานอยู่ระหว่าง 0 กับ 1"]
+        },
+        {
+          "sub_skill_id": "log_equations_inequalities",
+          "topics_th": ["สมบัติลอการิทึม", "เปลี่ยนฐาน", "สมการและอสมการลอการิทึม"],
+          "ipst_applied_contexts": ["เดซิเบล pH ริกเตอร์"],
+          "classic_traps": ["ลืมตรวจเงื่อนไขหลัง log > 0 และฐาน > 0, != 1"]
+        },
+        {
+          "sub_skill_id": "expo_log_growth_decay_model",
+          "topics_th": ["ครึ่งชีวิต (Half-life)", "แบบจำลองประชากร/ความเข้มเสียง"],
+          "ipst_applied_contexts": ["โจทย์ประยุกต์ครึ่งชีวิตสารกัมมันตรังสีหรือการเติบโตต่อเนื่อง"],
+          "classic_traps": ["แทนหน่วยเวลาไม่ตรงกันระหว่าง t กับครึ่งชีวิต"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "trigonometry",
+      "strand_id": "number_algebra",
+      "name_th": "ฟังก์ชันตรีโกณมิติ",
+      "grade_level": "M5",
+      "learning_outcomes": [
+        "ใช้เอกลักษณ์ ฟังก์ชันผกผัน สมการตรีโกณมิติ และกฎของไซน์-โคไซน์แก้ปัญหาเรขาคณิตและระยะทาง"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "trig_identities_equations",
+          "topics_th": ["ผลบวกผลต่างมุม", "มุมสองเท่า/ครึ่งเท่า", "ผลคูณเป็นผลบวก", "สมการตรีโกณมิติ"],
+          "ipst_applied_contexts": ["คลื่นคาบ/ชิงช้าสวรรค์/ระดับน้ำขึ้นลง"],
+          "classic_traps": ["ตกหล่นคำตอบในบางจตุภาค หรือหารด้วย sin/cos ที่อาจเป็น 0"]
+        },
+        {
+          "sub_skill_id": "inverse_trig_functions",
+          "topics_th": ["arcsin, arccos, arctan", "ช่วงเรนจ์หลักของฟังก์ชันผกผัน"],
+          "ipst_applied_contexts": ["หามุมมอง/มุมเงยจากความสัมพันธ์อัตราส่วน"],
+          "classic_traps": ["ตอบมุมนอกช่วงเรนจ์หลัก เช่น arcsin ใน Q2"]
+        },
+        {
+          "sub_skill_id": "law_of_sines_cosines_applied",
+          "topics_th": ["กฎของไซน์", "กฎของโคไซน์", "พื้นที่สามเหลี่ยม (1/2)ab sin C"],
+          "ipst_applied_contexts": ["การเดินเรือ มุมแบริ่ง ระยะห่างระหว่างจุดสังเกต 3 จุด"],
+          "classic_traps": ["สลับมุมภายในกับมุมเงย/มุมก้ม หรือทิศแบริ่ง"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "complex_numbers",
+      "strand_id": "number_algebra",
+      "name_th": "จำนวนเชิงซ้อน",
+      "grade_level": "M5",
+      "learning_outcomes": [
+        "ดำเนินการจำนวนเชิงซ้อนในรูป a+bi และรูปเชิงขั้ว ใช้ทฤษฎีบทเดอมัวฟ์ และแก้สมการพหุนามที่มีรากเชิงซ้อน"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "complex_algebra_conjugate_modulus",
+          "topics_th": ["สังยุค", "ค่าสัมบูรณ์ |z|", "สมบัติ |z1 z2| = |z1||z2|", "กราฟบนระนาบเชิงซ้อน"],
+          "ipst_applied_contexts": ["ระยะห่างและบริเวณจุดบนระนาบเชิงซ้อน"],
+          "classic_traps": ["ใช้ |z1 + z2| = |z1| + |z2| แบบผิดๆ"]
+        },
+        {
+          "sub_skill_id": "polar_form_demoivre_roots",
+          "topics_th": ["รูปเชิงขั้ว r(cos theta + i sin theta)", "ทฤษฎีบทเดอมัวฟ์", "รากที่ n ของจำนวนเชิงซ้อน"],
+          "ipst_applied_contexts": ["รูปหลายเหลี่ยมปกติที่เกิดจากรากที่ n บนระนาบเชิงซ้อน"],
+          "classic_traps": ["หามุมอาร์กิวเมนต์ผิดจตุภาค (เช่น Q2/Q3)"]
+        },
+        {
+          "sub_skill_id": "complex_polynomial_roots",
+          "topics_th": ["รากสังยุคคู่ของพหุนามสัมประสิทธิ์จริง", "ผลบวกและผลคูณรากเชิงซ้อน"],
+          "ipst_applied_contexts": ["สร้างพหุนามกำลัง 3-4 เมื่อทราบรากเชิงซ้อน 1 ตัว"],
+          "classic_traps": ["ใช้ทฤษฎีรากสังยุคกับพหุนามที่สัมประสิทธิ์ไม่ใช่จำนวนจริง"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "matrices",
+      "strand_id": "number_algebra",
+      "name_th": "เมทริกซ์",
+      "grade_level": "M5",
+      "learning_outcomes": [
+        "ใช้สมบัติการคูณเมทริกซ์ ดีเทอร์มิแนนต์ เมทริกซ์ผกผัน และการดำเนินการตามแถวแก้ระบบสมการเชิงเส้น"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "matrix_operations_transpose",
+          "topics_th": ["การคูณเมทริกซ์", "ทรานสโพส (AB)^t = B^t A^t", "สมการเมทริกซ์"],
+          "ipst_applied_contexts": ["ตารางต้นทุน-ยอดขาย-ส่วนผสมสินค้าในรูปเมทริกซ์"],
+          "classic_traps": ["สลับที่การคูณ AB = BA โดยไม่มีเงื่อนไข"]
+        },
+        {
+          "sub_skill_id": "determinant_inverse_adjoint",
+          "topics_th": ["det(kA) = k^n det(A)", "det(AB)", "det(adj A) = det(A)^(n-1)", "เมทริกซ์เอกฐาน"],
+          "ipst_applied_contexts": ["หาค่าพารามิเตอร์ที่ทำให้เมทริกซ์หาอินเวอร์สไม่ได้"],
+          "classic_traps": ["ดึงค่าคงที่ k ออกจาก det แล้วลืมยกกำลังมิติ n"]
+        },
+        {
+          "sub_skill_id": "linear_systems_cramer_row_ops",
+          "topics_th": ["กฎของคราเมอร์", "Row Operations", "เงื่อนไขมีคำตอบเดียว/อนันต์/ไม่มีคำตอบ"],
+          "ipst_applied_contexts": ["ระบบสมการ 3 ตัวแปรจากโจทย์ผสมสารหรือจัดสรรทรัพยากร"],
+          "classic_traps": ["สรุปว่า det(A)=0 แปลว่าไม่มีคำตอบเสมอ (อาจมีอนันต์คำตอบ)"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "sequences_series",
+      "strand_id": "number_algebra",
+      "name_th": "ลำดับและอนุกรม",
+      "grade_level": "M5-M6",
+      "learning_outcomes": [
+        "เข้าใจลำดับและอนุกรมเลขคณิต-เรขาคณิต ลิมิตอนุกรมอนันต์ และประยุกต์เรื่องดอกเบี้ยทบต้น-มูลค่าเงิน-ค่างวด (หัวข้อเด่นหลักสูตร 2560)"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "arithmetic_geometric_sequences",
+          "topics_th": ["ลำดับเลขคณิต", "ลำดับเรขาคณิต", "พจน์ทั่วไป", "ผลบวก n พจน์แรก"],
+          "ipst_applied_contexts": ["รูปแบบการเรียง/การผลิตที่เพิ่มลดคงที่หรือเป็นอัตราส่วน"],
+          "classic_traps": ["นับจำนวนพจน์ n ผิดพลาดไป 1 พจน์"]
+        },
+        {
+          "sub_skill_id": "infinite_series_limit_convergence",
+          "topics_th": ["ลิมิตลำดับอนันต์", "อนุกรมเรขาคณิตอนันต์ |r|<1", "อนุกรมลู่เข้า-ลู่ออก"],
+          "ipst_applied_contexts": ["ระยะทางลูกบอลกระดอน/พื้นที่รูปเรขาคณิตซ้อนอนันต์"],
+          "classic_traps": ["ใช้สูตร a1/(1-r) โดยไม่เช็กเงื่อนไข |r|<1"]
+        },
+        {
+          "sub_skill_id": "sigma_telescoping_series",
+          "topics_th": ["สมบัติซิกมา", "อนุกรมพหุนาม", "อนุกรมเทเลสโคปิก (เศษส่วนย่อย)"],
+          "ipst_applied_contexts": ["หาผลรวมรูปแบบเศษส่วนซ้อนหรือผลต่างพจน์"],
+          "classic_traps": ["ดึงค่าคงที่ผิดหรือตัดพจน์หัว-ท้ายเทเลสโคปิกไม่ครบ"]
+        },
+        {
+          "sub_skill_id": "financial_math_compound_annuity",
+          "topics_th": ["ดอกเบี้ยทบต้น", "มูลค่าปัจจุบัน/อนาคต", "ค่างวด (ฝากต้นงวด vs ปลายงวด)", "ผ่อนชำระหนี้"],
+          "ipst_applied_contexts": ["ออมเงินรายเดือน ผ่อนบ้าน/รถ คิดดอกเบี้ยทบต้นทุกเดือน/ไตรมาส"],
+          "classic_traps": ["สับสนค่างวดต้นงวดกับปลายงวด", "ลืมหารอัตราดอกเบี้ยต่อปีด้วยจำนวนงวด k"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "analytic_geometry",
+      "strand_id": "measurement_geometry",
+      "name_th": "เรขาคณิตวิเคราะห์และภาคตัดกรวย",
+      "grade_level": "M4",
+      "learning_outcomes": [
+        "หาระยะทาง ความชัน สมการเส้นตรง วงกลม พาราโบลา วงรี และไฮเปอร์โบลา และประยุกต์ในปัญหาเรขาคณิต"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "line_distance_slope",
+          "topics_th": ["ระยะห่างจุด-เส้นตรง", "ระยะห่างเส้นขนาน", "เส้นตั้งฉาก", "จุดแบ่งส่วนของเส้นตรง"],
+          "ipst_applied_contexts": ["หาพิกัดตำแหน่งและระยะทางสั้นที่สุดบนแผนที่พิกัด"],
+          "classic_traps": ["ลืมปรับสัมประสิทธิ์เส้นขนานให้เท่ากันก่อนใช้สูตรระยะห่าง"]
+        },
+        {
+          "sub_skill_id": "circle_equations",
+          "topics_th": ["สมการวงกลม", "เส้นสัมผัสวงกลม", "จุดตัดวงกลมกับเส้นตรง"],
+          "ipst_applied_contexts": ["รัศมีสัญญาณ/ขอบเขตพื้นที่วงกลม"],
+          "classic_traps": ["จัดรูปกำลังสองสมบูรณ์พลาดเครื่องหมายจุดศูนย์กลาง"]
+        },
+        {
+          "sub_skill_id": "parabola_ellipse_hyperbola",
+          "topics_th": ["โฟกัส ไดเรกตริกซ์ แกนเอก-โท เส้นกำกับ", "นิยามผลบวก/ผลต่างระยะทางภาคตัดกรวย"],
+          "ipst_applied_contexts": ["จานดาวเทียมพาราโบลา ซุ้มโค้งวงรี วงโคจร"],
+          "classic_traps": ["สลับความสัมพันธ์ c^2 = a^2 - b^2 (วงรี) กับ c^2 = a^2 + b^2 (ไฮเปอร์โบลา)"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "vectors_3d",
+      "strand_id": "measurement_geometry",
+      "name_th": "เวกเตอร์ในสามมิติ",
+      "grade_level": "M5",
+      "learning_outcomes": [
+        "ใช้การบวกเวกเตอร์ ดอทโปรดักต์ และครอสโปรดักต์ในระบบพิกัดฉาก 3 มิติ หาความยาว มุม พื้นที่ และปริมาตร"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "vector_addition_scalar_3d",
+          "topics_th": ["พิกัด 3 มิติ", "ขนาดเวกเตอร์", "เวกเตอร์หนึ่งหน่วย", "เวกเตอร์ขนาน"],
+          "ipst_applied_contexts": ["ตำแหน่งและแรงลัพธ์ใน 3 มิติ"],
+          "classic_traps": ["ลืมทิศทางตรงข้าม (±) เมื่อหาเวกเตอร์ที่ขนาน"]
+        },
+        {
+          "sub_skill_id": "dot_product_angle_projection",
+          "topics_th": ["u . v = |u||v|cos theta", "เวกเตอร์ตั้งฉาก", "การกระจาย |u ± v|^2"],
+          "ipst_applied_contexts": ["หามุมระหว่างเส้นหรือเวกเตอร์ในรูปทรงสามมิติ"],
+          "classic_traps": ["สลับมุมภายในกับมุมภายนอกเมื่อหางเวกเตอร์ไม่ได้ชนกัน"]
+        },
+        {
+          "sub_skill_id": "cross_product_area_volume",
+          "topics_th": ["u x v", "พื้นที่สี่เหลี่ยมด้านขนาน/สามเหลี่ยม", "ปริมาตรทรงสี่เหลี่ยมด้านขนาน |u.(v x w)|"],
+          "ipst_applied_contexts": ["หาพื้นที่หน้าตัดหรือปริมาตรทรงตันในพิกัด 3 มิติ"],
+          "classic_traps": ["ลืมคูณ 1/2 สำหรับพื้นที่สามเหลี่ยม หรือทำเครื่องหมาย determinant ผิด"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "statistics",
+      "strand_id": "statistics_probability",
+      "name_th": "สถิติ",
+      "grade_level": "M6",
+      "learning_outcomes": [
+        "วิเคราะห์และตีความข้อมูลเชิงปริมาณด้วยค่ากลาง การวัดการกระจาย ตำแหน่งที่ของข้อมูล (แผนภาพกล่อง) และการแปลงข้อมูล"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "central_tendency_mean_median_mode",
+          "topics_th": ["ค่าเฉลี่ยเลขคณิต", "ค่าเฉลี่ยถ่วงน้ำหนัก/รวม", "มัธยฐาน", "ฐานนิยม"],
+          "ipst_applied_contexts": ["เปรียบเทียบผลการสอบ/รายได้ 2 กลุ่ม หรือแก้ข้อมูลที่บันทึกผิด"],
+          "classic_traps": ["ใช้สูตรค่าเฉลี่ยกลุ่มย่อยหาร 2 แทนที่จะถ่วงน้ำหนักด้วยจำนวนข้อมูล n"]
+        },
+        {
+          "sub_skill_id": "dispersion_sd_variance_iqr",
+          "topics_th": ["พิสัย", "IQR (Q3-Q1)", "ความแปรปรวนและส่วนเบี่ยงเบนมาตรฐาน (ประชากร n vs ตัวอย่าง n-1)"],
+          "ipst_applied_contexts": ["เปรียบเทียบความสม่ำเสมอของข้อมูลและค่านอกเกณฑ์ (Outlier)"],
+          "classic_traps": ["สับสนสูตรประชากร (หาร N) กับตัวอย่าง (หาร n-1) ซึ่งเป็นจุดเน้นใหม่ในหลักสูตร 2560"]
+        },
+        {
+          "sub_skill_id": "position_percentile_quartile_boxplot",
+          "topics_th": ["ควอร์ไทล์ เปอร์เซ็นต์ไทล์ (สูตร สสวท. r(n+1)/100)", "แผนภาพกล่อง (Box Plot)", "Outlier Q1-1.5IQR, Q3+1.5IQR"],
+          "ipst_applied_contexts": ["อ่าน/เปรียบเทียบแผนภาพกล่อง 2 ชุด หรือหาเกณฑ์คัดเลือกเปอร์เซ็นต์ไทล์"],
+          "classic_traps": ["ตีความความกว้างกล่องว่ามีจำนวนข้อมูลมากกว่า ทั้งที่แต่ละช่วงมี 25% เท่ากัน"]
+        },
+        {
+          "sub_skill_id": "data_transformation_linear_scaling",
+          "topics_th": ["การแปลงเชิงเส้น y = ax + b", "ผลต่อค่าเฉลี่ย มัธยฐาน SD ความแปรปรวน"],
+          "ipst_applied_contexts": ["ปรับคะแนนสอบหรือแปลงหน่วยสกุลเงิน/อุณหภูมิ"],
+          "classic_traps": ["บวกค่าคงที่ b เข้าไปใน SD หรือลืมยกกำลังสอง a ในความแปรปรวน"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "prob_distributions",
+      "strand_id": "statistics_probability",
+      "name_th": "การแจกแจงความน่าจะเป็นเบื้องต้น",
+      "grade_level": "M6",
+      "learning_outcomes": [
+        "เข้าใจตัวแปรสุ่ม ค่าคาดหมาย ความแปรปรวน การแจกแจงเอกรูปไม่ต่อเนื่อง การแจกแจงทวินาม และการแจกแจงปกติ (หัวข้อใหม่เด่นหลักสูตร 2560)"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "discrete_random_variable_expected_value",
+          "topics_th": ["ฟังก์ชันความน่าจะเป็น P(X=x)", "ค่าคาดหมาย E(X)", "ความแปรปรวน Var(X)", "การแจกแจงเอกรูปไม่ต่อเนื่อง"],
+          "ipst_applied_contexts": ["เกมชิงรางวัล การตั้งราคาประกันภัย กำไรคาดหวัง"],
+          "classic_traps": ["ลืมหักต้นทุน/ค่าซื้อตั๋วตอนคำนวณกำไรคาดหวัง"]
+        },
+        {
+          "sub_skill_id": "binomial_distribution",
+          "topics_th": ["การแจกแจงทวินาม B(n,p)", "P(X=k) = C(n,k) p^k (1-p)^(n-k)", "E(X)=np, Var(X)=np(1-p)"],
+          "ipst_applied_contexts": ["สุ่มตรวจสินค้าชำรุด เดาข้อสอบปรนัย การยิงจุดโทษซ้ำ n ครั้ง"],
+          "classic_traps": ["ลืมกรณี 'อย่างน้อย 1 ครั้ง' (1 - P(X=0)) หรือนับจำนวนครั้งซ้ำผิด"]
+        },
+        {
+          "sub_skill_id": "normal_distribution_z_score",
+          "topics_th": ["การแจกแจงปกติ N(mu, sigma^2)", "ค่ามาตรฐาน Z = (X-mu)/sigma", "ตารางพื้นที่ใต้โค้งปกติ P(Z <= z)"],
+          "ipst_applied_contexts": ["คัดเลือกคนเข้าเรียน/รับทุนจากคะแนนสอบปกติ หรืออายุการใช้งานแบตเตอรี่"],
+          "classic_traps": ["อ่านตาราง P(Z <= z) สลับกับ P(0 <= Z <= z) หรือผิดฝั่งซ้าย/ขวา"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "counting",
+      "strand_id": "statistics_probability",
+      "name_th": "หลักการนับเบื้องต้น",
+      "grade_level": "M4-M5",
+      "learning_outcomes": [
+        "ใช้หลักการบวก การคูณ การเรียงสับเปลี่ยน การจัดหมู่ และทฤษฎีบททวินามแก้ปัญหาการนับ"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "fundamental_counting_principle",
+          "topics_th": ["กฎการบวกและกฎการคูณ", "การสร้างเลขหลายหลักมีเงื่อนไข"],
+          "ipst_applied_contexts": ["สร้างรหัสผ่าน/ป้ายทะเบียน/จัดตารางงาน"],
+          "classic_traps": ["ลืมแยกกรณีเลข 0 อยู่หลักหน้าสุดหรือหลักหน่วยเมื่อสร้างเลขคู่"]
+        },
+        {
+          "sub_skill_id": "permutations_linear_circular",
+          "topics_th": ["เรียงสับเปลี่ยนเชิงเส้นของต่าง/ซ้ำ", "เรียงสับเปลี่ยนวงกลม", "มัดติดกัน vs แทรกไม่ติดกัน"],
+          "ipst_applied_contexts": ["จัดคนนั่งโต๊ะกลม/แถวตรงโดยมีเงื่อนไขห้ามติดกัน"],
+          "classic_traps": ["ลืมคูณการสลับภายในกลุ่มที่มัดติดกัน"]
+        },
+        {
+          "sub_skill_id": "combinations_binomial_theorem",
+          "topics_th": ["การจัดหมู่ C(n,r)", "การแบ่งกลุ่มของเหมือน/ต่าง", "ทฤษฎีบททวินามหาสัมประสิทธิ์"],
+          "ipst_applied_contexts": ["คัดเลือกคณะกรรมการ/แบ่งทีม/หาพจน์เฉพาะใน (ax + b/x)^n"],
+          "classic_traps": ["ลืมหาร k! เมื่อแบ่งกลุ่มขนาดเท่ากันที่ไม่มีชื่อกลุ่ม"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "probability",
+      "strand_id": "statistics_probability",
+      "name_th": "ความน่าจะเป็น",
+      "grade_level": "M4-M5",
+      "learning_outcomes": [
+        "คำนวณความน่าจะเป็นของเหตุการณ์โดยใช้กฎการบวก เหตุการณ์อิสระ และความน่าจะเป็นแบบมีเงื่อนไข"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "classical_probability_sample_space",
+          "topics_th": ["ปริภูมิตัวอย่าง n(S)", "P(E) = n(E)/n(S)", "หยิบพร้อมกัน vs หยิบทีละชิ้น"],
+          "ipst_applied_contexts": ["สุ่มหยิบสลาก/ลูกบอล/เลือกคู่แข่งขัน"],
+          "classic_traps": ["นับ n(S) แบบสนใจลำดับ แต่นับ n(E) แบบไม่สนใจลำดับ"]
+        },
+        {
+          "sub_skill_id": "conditional_probability_independence",
+          "topics_th": ["ความน่าจะเป็นมีเงื่อนไข P(A|B)", "เหตุการณ์อิสระ P(A^B)=P(A)P(B)", "แผนภาพต้นไม้หลายขั้น"],
+          "ipst_applied_contexts": ["สุ่มตรวจโรค/คัดกรองสินค้า 2 ขั้นตอน"],
+          "classic_traps": ["สับสนเหตุการณ์อิสระ (Independent) กับไม่เกิดร่วมกัน (Mutually Exclusive)"]
+        },
+        {
+          "sub_skill_id": "complementary_addition_rules",
+          "topics_th": ["P(A U B) = P(A)+P(B)-P(A^B)", "เหตุการณ์ตรงข้าม 1 - P(E')"],
+          "ipst_applied_contexts": ["ความน่าจะเป็นที่จะได้อย่างน้อย 1 อย่างหรืออย่างใดอย่างหนึ่ง"],
+          "classic_traps": ["ลืมลบส่วนซ้ำ P(A intersect B)"]
+        }
+      ]
+    },
+    {
+      "chapter_id": "calculus",
+      "strand_id": "calculus",
+      "name_th": "แคลคูลัสเบื้องต้น",
+      "grade_level": "M6",
+      "learning_outcomes": [
+        "ใช้ลิมิต ความต่อเนื่อง อนุพันธ์ ค่าสุดขีด และปริพันธ์จำกัดเขตแก้ปัญหาอัตราการเปลี่ยนแปลง ค่าสูงสุดต่ำสุด และพื้นที่ใต้กราฟ"
+      ],
+      "sub_skill_details": [
+        {
+          "sub_skill_id": "limit_continuity",
+          "topics_th": ["ลิมิตซ้าย-ขวา", "ลิมิต 0/0 แยกตัวประกอบ/สังยุค", "ความต่อเนื่องที่จุด x=c"],
+          "ipst_applied_contexts": ["ฟังก์ชันแบ่งช่วงที่ต้องหาพารามิเตอร์ให้ต่อเนื่องและหาอนุพันธ์ได้"],
+          "classic_traps": ["เช็กแค่ความต่อเนื่องแต่ลืมเช็กอนุพันธ์ซ้าย=อนุพันธ์ขวา (มุมแหลม)"]
+        },
+        {
+          "sub_skill_id": "differentiation_tangent_rate",
+          "topics_th": ["กฎผลคูณ/ผลหาร/ลูกโซ่", "ความชันเส้นสัมผัสและเส้นตั้งฉาก", "อัตราการเปลี่ยนแปลง/ความเร็ว-ความเร่ง"],
+          "ipst_applied_contexts": ["โจทย์เส้นสัมผัสกราฟพหุนามหรือการเคลื่อนที่แนวตรง"],
+          "classic_traps": ["ลืมดิฟไส้ในกฎลูกโซ่ หรือแทนค่าจุดสัมผัสผิด"]
+        },
+        {
+          "sub_skill_id": "extrema_optimization_word_problem",
+          "topics_th": ["ค่าวิกฤต", "ฟังก์ชันเพิ่ม-ลด", "ค่าสูงสุด/ต่ำสุดสัมพัทธ์และสัมบูรณ์บนช่วงปิด"],
+          "ipst_applied_contexts": ["โจทย์ประยุกต์หากำไรสูงสุด ต้นทุนต่ำสุด ปริมาตรกล่อง/พื้นที่มากสุด"],
+          "classic_traps": ["ลืมตรวจค่าปลายช่วงปิด [a, b] ตอนหาค่าสุดขีดสัมบูรณ์"]
+        },
+        {
+          "sub_skill_id": "integration_area_under_curve",
+          "topics_th": ["ปริพันธ์ไม่จำกัดเขตและจำกัดเขต", "หาฟังก์ชันจาก f'(x) และ f''(x)", "พื้นที่ปิดล้อมด้วยเส้นโค้ง"],
+          "ipst_applied_contexts": ["หาระยะทางจากกราฟความเร็ว หรือพื้นที่ระหว่างโค้งสองเส้น"],
+          "classic_traps": ["อินทิเกรตข้ามจุดตัดแกน X โดยไม่แบ่งช่วงติดค่าสัมบูรณ์ (พื้นที่หักล้างกัน)"]
+        }
+      ]
+    }
+  ]
+}

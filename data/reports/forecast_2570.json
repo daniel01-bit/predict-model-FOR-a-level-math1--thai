@@ -1,0 +1,446 @@
+{
+  "target_year_be": 2570,
+  "mode": "model_c_full_3tier",
+  "training_questions_count": 224,
+  "subskill_probs": {
+    "absolute_value_equations_inequalities": 0.008091342780539258,
+    "arithmetic_geometric_sequences": 0.03446594940246614,
+    "binomial_distribution": 0.034856561665218375,
+    "cardinality_word_problem": 0.027580893933949396,
+    "central_tendency_mean_median_mode": 0.02967111192596187,
+    "circle_equations": 0.013119742922525079,
+    "classical_probability_sample_space": 0.03035721170524483,
+    "combinations_binomial_theorem": 0.01731672366869592,
+    "complementary_addition_rules": 0.009392978935157597,
+    "complex_algebra_conjugate_modulus": 0.026565357408522682,
+    "complex_polynomial_roots": 0.004551744543026918,
+    "composite_inverse_function": 0.01283841019054288,
+    "conditional_probability_independence": 0.004161140219702199,
+    "cross_product_area_volume": 0.026305870230797296,
+    "data_transformation_linear_scaling": 0.004161140219702199,
+    "determinant_inverse_adjoint": 0.02467927801526753,
+    "differentiation_tangent_rate": 0.03212600160577973,
+    "discrete_random_variable_expected_value": 0.004161140219702199,
+    "dispersion_sd_variance_iqr": 0.012507270330547722,
+    "domain_range_graph": 0.039719949915369604,
+    "dot_product_angle_projection": 0.036398984636807546,
+    "expo_equations_inequalities": 0.02143649359496154,
+    "expo_log_growth_decay_model": 0.009132576052941117,
+    "extrema_optimization_word_problem": 0.010171676092605378,
+    "financial_math_compound_annuity": 0.013547063569593024,
+    "fundamental_counting_principle": 0.03086939479563441,
+    "infinite_series_limit_convergence": 0.01887081362739868,
+    "integration_area_under_curve": 0.02427580703964071,
+    "inverse_trig_functions": 0.00935008282342218,
+    "law_of_sines_cosines_applied": 0.02428716058604082,
+    "limit_continuity": 0.03185586815669339,
+    "line_distance_slope": 0.016563955126142726,
+    "linear_systems_cramer_row_ops": 0.011304143729721801,
+    "log_equations_inequalities": 0.031312101230490726,
+    "matrix_operations_transpose": 0.010086772378805968,
+    "normal_distribution_z_score": 0.025189669319235587,
+    "parabola_ellipse_hyperbola": 0.024353017859545936,
+    "permutations_linear_circular": 0.011673299997178812,
+    "piecewise_applied_function": 0.014151150068295155,
+    "polar_form_demoivre_roots": 0.023447405360626634,
+    "polynomial_remainder_factor": 0.03756529146963549,
+    "position_percentile_quartile_boxplot": 0.015505807875712948,
+    "power_set_subset": 0.007873836010058194,
+    "quantifiers_negation": 0.010636313056658438,
+    "rational_inequalities": 0.007476319251007968,
+    "set_operations_venn": 0.01942363038453691,
+    "sigma_telescoping_series": 0.024594374301468117,
+    "tautology_validity": 0.024499087561771583,
+    "trig_identities_equations": 0.03285296059429364,
+    "truth_table_equivalence": 0.017159198214255537,
+    "vector_addition_scalar_3d": 0.007505925396099573
+  },
+  "cross_topic_pairs": {
+    "calculus": [
+      [
+        "functions",
+        4
+      ],
+      [
+        "sequences_series",
+        3
+      ],
+      [
+        "analytic_geometry",
+        2
+      ]
+    ],
+    "complex_numbers": [
+      [
+        "analytic_geometry",
+        3
+      ],
+      [
+        "real_numbers",
+        2
+      ]
+    ],
+    "sequences_series": [
+      [
+        "expo_log",
+        7
+      ],
+      [
+        "trigonometry",
+        6
+      ],
+      [
+        "analytic_geometry",
+        1
+      ]
+    ],
+    "probability": [
+      [
+        "counting",
+        6
+      ]
+    ],
+    "functions": [
+      [
+        "analytic_geometry",
+        3
+      ],
+      [
+        "real_numbers",
+        3
+      ]
+    ],
+    "prob_distributions": [
+      [
+        "counting",
+        3
+      ]
+    ],
+    "vectors_3d": [
+      [
+        "trigonometry",
+        3
+      ]
+    ],
+    "expo_log": [
+      [
+        "sets",
+        1
+      ]
+    ],
+    "matrices": [
+      [
+        "probability",
+        1
+      ]
+    ],
+    "real_numbers": [
+      [
+        "sequences_series",
+        1
+      ]
+    ]
+  },
+  "slots": [
+    {
+      "slot_number": 1,
+      "strand_id": "number_algebra",
+      "chapter_id": "sequences_series",
+      "sub_skill_id": "arithmetic_geometric_sequences",
+      "secondary_chapter": "expo_log",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.03447,
+      "rationale": "Predicted p=0.0345 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 2,
+      "strand_id": "number_algebra",
+      "chapter_id": "trigonometry",
+      "sub_skill_id": "trig_identities_equations",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.03285,
+      "rationale": "Predicted p=0.0329 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 3,
+      "strand_id": "number_algebra",
+      "chapter_id": "expo_log",
+      "sub_skill_id": "log_equations_inequalities",
+      "secondary_chapter": "sets",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.03131,
+      "rationale": "Predicted p=0.0313 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 4,
+      "strand_id": "number_algebra",
+      "chapter_id": "sets",
+      "sub_skill_id": "cardinality_word_problem",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02758,
+      "rationale": "Predicted p=0.0276 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 5,
+      "strand_id": "number_algebra",
+      "chapter_id": "complex_numbers",
+      "sub_skill_id": "complex_algebra_conjugate_modulus",
+      "secondary_chapter": "analytic_geometry",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02657,
+      "rationale": "Predicted p=0.0266 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 6,
+      "strand_id": "number_algebra",
+      "chapter_id": "matrices",
+      "sub_skill_id": "determinant_inverse_adjoint",
+      "secondary_chapter": "probability",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02468,
+      "rationale": "Predicted p=0.0247 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 7,
+      "strand_id": "number_algebra",
+      "chapter_id": "logic",
+      "sub_skill_id": "tautology_validity",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.0245,
+      "rationale": "Predicted p=0.0245 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 8,
+      "strand_id": "number_algebra",
+      "chapter_id": "sequences_series",
+      "sub_skill_id": "sigma_telescoping_series",
+      "secondary_chapter": "expo_log",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02459,
+      "rationale": "Predicted p=0.0246 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 9,
+      "strand_id": "number_algebra",
+      "chapter_id": "trigonometry",
+      "sub_skill_id": "law_of_sines_cosines_applied",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02429,
+      "rationale": "Predicted p=0.0243 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 10,
+      "strand_id": "number_algebra",
+      "chapter_id": "complex_numbers",
+      "sub_skill_id": "polar_form_demoivre_roots",
+      "secondary_chapter": "analytic_geometry",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02345,
+      "rationale": "Predicted p=0.0234 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 11,
+      "strand_id": "number_algebra",
+      "chapter_id": "expo_log",
+      "sub_skill_id": "expo_equations_inequalities",
+      "secondary_chapter": "sets",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02144,
+      "rationale": "Predicted p=0.0214 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 12,
+      "strand_id": "number_algebra",
+      "chapter_id": "sets",
+      "sub_skill_id": "set_operations_venn",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.01942,
+      "rationale": "Predicted p=0.0194 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 13,
+      "strand_id": "number_algebra",
+      "chapter_id": "sequences_series",
+      "sub_skill_id": "infinite_series_limit_convergence",
+      "secondary_chapter": "expo_log",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.01887,
+      "rationale": "Predicted p=0.0189 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 14,
+      "strand_id": "number_algebra",
+      "chapter_id": "logic",
+      "sub_skill_id": "truth_table_equivalence",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.01716,
+      "rationale": "Predicted p=0.0172 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 15,
+      "strand_id": "number_algebra",
+      "chapter_id": "functions",
+      "sub_skill_id": "piecewise_applied_function",
+      "secondary_chapter": "analytic_geometry",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.01415,
+      "rationale": "Predicted p=0.0142 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 16,
+      "strand_id": "measurement_geometry",
+      "chapter_id": "analytic_geometry",
+      "sub_skill_id": "parabola_ellipse_hyperbola",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02435,
+      "rationale": "Predicted p=0.0244 within MyTCAS strand 'measurement_geometry'"
+    },
+    {
+      "slot_number": 17,
+      "strand_id": "measurement_geometry",
+      "chapter_id": "vectors_3d",
+      "sub_skill_id": "cross_product_area_volume",
+      "secondary_chapter": "trigonometry",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02631,
+      "rationale": "Predicted p=0.0263 within MyTCAS strand 'measurement_geometry'"
+    },
+    {
+      "slot_number": 18,
+      "strand_id": "statistics_probability",
+      "chapter_id": "counting",
+      "sub_skill_id": "fundamental_counting_principle",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.03087,
+      "rationale": "Predicted p=0.0309 within MyTCAS strand 'statistics_probability'"
+    },
+    {
+      "slot_number": 19,
+      "strand_id": "statistics_probability",
+      "chapter_id": "probability",
+      "sub_skill_id": "classical_probability_sample_space",
+      "secondary_chapter": "counting",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.03036,
+      "rationale": "Predicted p=0.0304 within MyTCAS strand 'statistics_probability'"
+    },
+    {
+      "slot_number": 20,
+      "strand_id": "statistics_probability",
+      "chapter_id": "statistics",
+      "sub_skill_id": "central_tendency_mean_median_mode",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02967,
+      "rationale": "Predicted p=0.0297 within MyTCAS strand 'statistics_probability'"
+    },
+    {
+      "slot_number": 21,
+      "strand_id": "statistics_probability",
+      "chapter_id": "prob_distributions",
+      "sub_skill_id": "normal_distribution_z_score",
+      "secondary_chapter": "counting",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02519,
+      "rationale": "Predicted p=0.0252 within MyTCAS strand 'statistics_probability'"
+    },
+    {
+      "slot_number": 22,
+      "strand_id": "statistics_probability",
+      "chapter_id": "counting",
+      "sub_skill_id": "combinations_binomial_theorem",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.01732,
+      "rationale": "Predicted p=0.0173 within MyTCAS strand 'statistics_probability'"
+    },
+    {
+      "slot_number": 23,
+      "strand_id": "statistics_probability",
+      "chapter_id": "statistics",
+      "sub_skill_id": "position_percentile_quartile_boxplot",
+      "secondary_chapter": null,
+      "question_format": "mcq_5",
+      "predicted_prob": 0.01551,
+      "rationale": "Predicted p=0.0155 within MyTCAS strand 'statistics_probability'"
+    },
+    {
+      "slot_number": 24,
+      "strand_id": "calculus",
+      "chapter_id": "calculus",
+      "sub_skill_id": "limit_continuity",
+      "secondary_chapter": "functions",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.03186,
+      "rationale": "Predicted p=0.0319 within MyTCAS strand 'calculus'"
+    },
+    {
+      "slot_number": 25,
+      "strand_id": "calculus",
+      "chapter_id": "calculus",
+      "sub_skill_id": "integration_area_under_curve",
+      "secondary_chapter": "functions",
+      "question_format": "mcq_5",
+      "predicted_prob": 0.02428,
+      "rationale": "Predicted p=0.0243 within MyTCAS strand 'calculus'"
+    },
+    {
+      "slot_number": 26,
+      "strand_id": "number_algebra",
+      "chapter_id": "functions",
+      "sub_skill_id": "domain_range_graph",
+      "secondary_chapter": "analytic_geometry",
+      "question_format": "numeric",
+      "predicted_prob": 0.03972,
+      "rationale": "Predicted p=0.0397 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 27,
+      "strand_id": "number_algebra",
+      "chapter_id": "real_numbers",
+      "sub_skill_id": "polynomial_remainder_factor",
+      "secondary_chapter": "sequences_series",
+      "question_format": "numeric",
+      "predicted_prob": 0.03757,
+      "rationale": "Predicted p=0.0376 within MyTCAS strand 'number_algebra'"
+    },
+    {
+      "slot_number": 28,
+      "strand_id": "measurement_geometry",
+      "chapter_id": "vectors_3d",
+      "sub_skill_id": "dot_product_angle_projection",
+      "secondary_chapter": "trigonometry",
+      "question_format": "numeric",
+      "predicted_prob": 0.0364,
+      "rationale": "Predicted p=0.0364 within MyTCAS strand 'measurement_geometry'"
+    },
+    {
+      "slot_number": 29,
+      "strand_id": "statistics_probability",
+      "chapter_id": "prob_distributions",
+      "sub_skill_id": "binomial_distribution",
+      "secondary_chapter": "counting",
+      "question_format": "numeric",
+      "predicted_prob": 0.03486,
+      "rationale": "Predicted p=0.0349 within MyTCAS strand 'statistics_probability'"
+    },
+    {
+      "slot_number": 30,
+      "strand_id": "calculus",
+      "chapter_id": "calculus",
+      "sub_skill_id": "differentiation_tangent_rate",
+      "secondary_chapter": "functions",
+      "question_format": "numeric",
+      "predicted_prob": 0.03213,
+      "rationale": "Predicted p=0.0321 within MyTCAS strand 'calculus'"
+    }
+  ]
+}

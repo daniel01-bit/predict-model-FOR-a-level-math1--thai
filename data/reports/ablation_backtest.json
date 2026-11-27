@@ -1,0 +1,108 @@
+{
+  "test_years_be": [
+    2568,
+    2569
+  ],
+  "winner_mode": "model_c_full_3tier",
+  "beats_naive_baseline": true,
+  "summary": {
+    "naive_uniform": {
+      "mean_recall_at_10": 0.8,
+      "mean_recall_at_15": 0.6333,
+      "mean_brier_score": 0.23803,
+      "mean_log_loss": 0.66917
+    },
+    "model_a_tier1": {
+      "mean_recall_at_10": 0.85,
+      "mean_recall_at_15": 0.8334,
+      "mean_brier_score": 0.23591,
+      "mean_log_loss": 1.25631
+    },
+    "model_b_tier1_tier2": {
+      "mean_recall_at_10": 0.85,
+      "mean_recall_at_15": 0.8334,
+      "mean_brier_score": 0.22059,
+      "mean_log_loss": 1.01647
+    },
+    "model_c_full_3tier": {
+      "mean_recall_at_10": 0.8,
+      "mean_recall_at_15": 0.8334,
+      "mean_brier_score": 0.21555,
+      "mean_log_loss": 0.97946
+    }
+  },
+  "folds": [
+    {
+      "test_year_be": 2568,
+      "mode": "naive_uniform",
+      "recall_at_10": 0.8,
+      "recall_at_15": 0.6667,
+      "brier_score": 0.22924,
+      "log_loss": 0.65145,
+      "actual_unique_skills": 36
+    },
+    {
+      "test_year_be": 2568,
+      "mode": "model_a_tier1",
+      "recall_at_10": 0.9,
+      "recall_at_15": 0.8667,
+      "brier_score": 0.26771,
+      "log_loss": 0.84584,
+      "actual_unique_skills": 36
+    },
+    {
+      "test_year_be": 2568,
+      "mode": "model_b_tier1_tier2",
+      "recall_at_10": 0.9,
+      "recall_at_15": 0.8667,
+      "brier_score": 0.23841,
+      "log_loss": 0.66896,
+      "actual_unique_skills": 36
+    },
+    {
+      "test_year_be": 2568,
+      "mode": "model_c_full_3tier",
+      "recall_at_10": 0.9,
+      "recall_at_15": 0.8667,
+      "brier_score": 0.22816,
+      "log_loss": 0.63965,
+      "actual_unique_skills": 36
+    },
+    {
+      "test_year_be": 2569,
+      "mode": "naive_uniform",
+      "recall_at_10": 0.8,
+      "recall_at_15": 0.6,
+      "brier_score": 0.24683,
+      "log_loss": 0.68689,
+      "actual_unique_skills": 29
+    },
+    {
+      "test_year_be": 2569,
+      "mode": "model_a_tier1",
+      "recall_at_10": 0.8,
+      "recall_at_15": 0.8,
+      "brier_score": 0.20412,
+      "log_loss": 1.66678,
+      "actual_unique_skills": 29
+    },
+    {
+      "test_year_be": 2569,
+      "mode": "model_b_tier1_tier2",
+      "recall_at_10": 0.8,
+      "recall_at_15": 0.8,
+      "brier_score": 0.20278,
+      "log_loss": 1.36398,
+      "actual_unique_skills": 29
+    },
+    {
+      "test_year_be": 2569,
+      "mode": "model_c_full_3tier",
+      "recall_at_10": 0.7,
+      "recall_at_15": 0.8,
+      "brier_score": 0.20295,
+      "log_loss": 1.31927,
+      "actual_unique_skills": 29
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+{
+  "curriculum_version": "IPST_2560",
+  "exam_name": "A-Level Applied Mathematics 1 (Math 1)",
+  "total_questions": 30,
+  "formats": {
+    "mcq_5": { "count": 25, "points_each": 3 },
+    "numeric": { "count": 5, "points_each": 5 }
+  },
+  "strands": [
+    {
+      "id": "number_algebra",
+      "name_th": "สาระจำนวนและพีชคณิต",
+      "min_questions": 15,
+      "max_questions": 17,
+      "chapters": [
+        {
+          "id": "sets",
+          "name_th": "เซต",
+          "sub_skills": [
+            "set_operations_venn",
+            "power_set_subset",
+            "cardinality_word_problem"
+          ]
+        },
+        {
+          "id": "logic",
+          "name_th": "ตรรกศาสตร์",
+          "sub_skills": [
+            "truth_table_equivalence",
+            "tautology_validity",
+            "quantifiers_negation"
+          ]
+        },
+        {
+          "id": "real_numbers",
+          "name_th": "จำนวนจริงและพหุนาม",
+          "sub_skills": [
+            "polynomial_remainder_factor",
+            "rational_inequalities",
+            "absolute_value_equations_inequalities"
+          ]
+        },
+        {
+          "id": "functions",
+          "name_th": "ฟังก์ชัน",
+          "sub_skills": [
+            "domain_range_graph",
+            "composite_inverse_function",
+            "piecewise_applied_function"
+          ]
+        },
+        {
+          "id": "expo_log",
+          "name_th": "ฟังก์ชันเอกซ์โพเนนเชียลและฟังก์ชันลอการิทึม",
+          "sub_skills": [
+            "expo_equations_inequalities",
+            "log_equations_inequalities",
+            "expo_log_growth_decay_model"
+          ]
+        },
+        {
+          "id": "trigonometry",
+          "name_th": "ฟังก์ชันตรีโกณมิติ",
+          "sub_skills": [
+            "trig_identities_equations",
+            "inverse_trig_functions",
+            "law_of_sines_cosines_applied"
+          ]
+        },
+        {
+          "id": "complex_numbers",
+          "name_th": "จำนวนเชิงซ้อน",
+          "sub_skills": [
+            "complex_algebra_conjugate_modulus",
+            "polar_form_demoivre_roots",
+            "complex_polynomial_roots"
+          ]
+        },
+        {
+          "id": "matrices",
+          "name_th": "เมทริกซ์",
+          "sub_skills": [
+            "matrix_operations_transpose",
+            "determinant_inverse_adjoint",
+            "linear_systems_cramer_row_ops"
+          ]
+        },
+        {
+          "id": "sequences_series",
+          "name_th": "ลำดับและอนุกรม",
+          "sub_skills": [
+            "arithmetic_geometric_sequences",
+            "infinite_series_limit_convergence",
+            "sigma_telescoping_series",
+            "financial_math_compound_annuity"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "measurement_geometry",
+      "name_th": "สาระการวัดและเรขาคณิต",
+      "min_questions": 3,
+      "max_questions": 5,
+      "chapters": [
+        {
+          "id": "analytic_geometry",
+          "name_th": "เรขาคณิตวิเคราะห์และภาคตัดกรวย",
+          "sub_skills": [
+            "line_distance_slope",
+            "circle_equations",
+            "parabola_ellipse_hyperbola"
+          ]
+        },
+        {
+          "id": "vectors_3d",
+          "name_th": "เวกเตอร์ในสามมิติ",
+          "sub_skills": [
+            "vector_addition_scalar_3d",
+            "dot_product_angle_projection",
+            "cross_product_area_volume"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "statistics_probability",
+      "name_th": "สาระสถิติและความน่าจะเป็น",
+      "min_questions": 6,
+      "max_questions": 8,
+      "chapters": [
+        {
+          "id": "statistics",
+          "name_th": "สถิติ",
+          "sub_skills": [
+            "central_tendency_mean_median_mode",
+            "dispersion_sd_variance_iqr",
+            "position_percentile_quartile_boxplot",
+            "data_transformation_linear_scaling"
+          ]
+        },
+        {
+          "id": "prob_distributions",
+          "name_th": "การแจกแจงความน่าจะเป็นเบื้องต้น",
+          "sub_skills": [
+            "discrete_random_variable_expected_value",
+            "binomial_distribution",
+            "normal_distribution_z_score"
+          ]
+        },
+        {
+          "id": "counting",
+          "name_th": "หลักการนับเบื้องต้น",
+          "sub_skills": [
+            "fundamental_counting_principle",
+            "permutations_linear_circular",
+            "combinations_binomial_theorem"
+          ]
+        },
+        {
+          "id": "probability",
+          "name_th": "ความน่าจะเป็น",
+          "sub_skills": [
+            "classical_probability_sample_space",
+            "conditional_probability_independence",
+            "complementary_addition_rules"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "calculus",
+      "name_th": "สาระแคลคูลัส",
+      "min_questions": 2,
+      "max_questions": 4,
+      "chapters": [
+        {
+          "id": "calculus",
+          "name_th": "แคลคูลัสเบื้องต้น",
+          "sub_skills": [
+            "limit_continuity",
+            "differentiation_tangent_rate",
+            "extrema_optimization_word_problem",
+            "integration_area_under_curve"
+          ]
+        }
+      ]
+    }
+  ],
+  "deprecated_topics_hard_filter": [
+    "linear_programming",
+    "old_regression_correlation",
+    "lhopital_rule",
+    "number_theory_gcd_congruence",
+    "graph_theory",
+    "math_induction",
+    "polar_conics_rotation",
+    "normal_curve_old_table_interpolation_only"
+  ]
+}

@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A-Level Math 1 — AI Exam Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #14151a;
+    --surface-hover: #1d1f27;
+    --border: rgba(255, 255, 255, 0.11);
+    --border-hover: rgba(255, 255, 255, 0.24);
+    --text: #f3f4f6;
+    --text-muted: #9ca3af;
+    --accent: #84a94d;
+    --danger: #f87171;
+    --ok: #34d399;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', 'Noto Sans Thai', system-ui, sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Subtle deep green bottom ambient aura */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse 72% 42% at 50% 106%,
+      rgba(74, 134, 52, 0.46) 0%,
+      rgba(38, 72, 28, 0.25) 45%,
+      rgba(0, 0, 0, 0) 78%
+    );
+    z-index: 0;
+  }
+
+  .app-shell {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Top Bar (Model Switcher Pill + API Key Manager) */
+  .top-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 24px 8px;
+  }
+
+  .model-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(24, 25, 32, 0.88);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .model-pill:hover {
+    border-color: var(--border-hover);
+    background: rgba(32, 34, 44, 0.94);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    flex-shrink: 0;
+  }
+
+  .status-dot.off { background: var(--danger); }
+
+  .model-select {
+    background: transparent;
+    color: var(--text);
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    padding-right: 4px;
+  }
+
+  .model-select option, .model-select optgroup {
+    background: #14151a;
+    color: var(--text);
+  }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(24, 25, 32, 0.88);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .icon-btn:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
+    background: var(--surface-hover);
+  }
+
+  /* Top-Right Real-Time Quota Gauge HUD */
+  .quota-hud {
+    position: fixed;
+    top: 18px;
+    right: 22px;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .quota-pill {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 290px;
+    max-width: 350px;
+    background: rgba(20, 21, 26, 0.94);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 13px 16px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .quota-model-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .quota-model-name {
+    color: #f3f4f6;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .quota-provider-tag {
+    color: #9ca3af;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .quota-hide-btn {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 3px;
+    transition: color 0.15s;
+  }
+
+  .quota-hide-btn:hover { color: #f3f4f6; }
+
+  .quota-activity-box {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .quota-activity-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #9ca3af;
+    line-height: 1.4;
+  }
+
+  .quota-activity-row.active { color: #bef264; }
+
+  .quota-activity-detail {
+    font-size: 11.5px;
+    color: #9ca3af;
+    line-height: 1.45;
+    padding-left: 20px;
+    word-break: break-word;
+  }
+
+  .quota-activity-log {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 2px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    font-family: 'JetBrains Mono', 'Noto Sans Thai', monospace;
+    font-size: 10.5px;
+    color: #71717a;
+    line-height: 1.45;
+  }
+
+  .quota-activity-log:empty { display: none; }
+
+  .quota-spinner {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid rgba(190, 242, 100, 0.25);
+    border-top-color: #bef264;
+    animation: qSpin 0.8s linear infinite;
+    display: none;
+    flex-shrink: 0;
+  }
+
+  .quota-activity-row.active .quota-spinner { display: inline-block; }
+
+  @keyframes qSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  .quota-reopen-btn {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: rgba(20, 21, 26, 0.88);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 11.5px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .quota-reopen-btn:hover {
+    color: var(--text);
+    border-color: var(--border-hover);
+  }
+
+  .quota-hud.collapsed .quota-pill,
+  .quota-hud.collapsed .quota-toast { display: none !important; }
+  .quota-hud.collapsed .quota-reopen-btn { display: inline-flex; }
+
+  .quota-pill.state-low { border-color: rgba(251, 191, 36, 0.42); }
+  .quota-pill.state-limited {
+    border-color: rgba(248, 113, 113, 0.55);
+    box-shadow: 0 0 18px rgba(248, 113, 113, 0.16);
+  }
+
+  .quota-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .quota-label-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .quota-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ok);
+    flex-shrink: 0;
+  }
+
+  .quota-dot.low { background: #fbbf24; }
+  .quota-dot.limited {
+    background: var(--danger);
+    animation: quotaPulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes quotaPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+
+  .quota-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .quota-track {
+    width: 100%;
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.09);
+    overflow: hidden;
+  }
+
+  .quota-fill {
+    height: 100%;
+    width: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #34d399, #84a94d);
+    transition: width 0.35s ease, background 0.3s ease;
+  }
+
+  .quota-fill.low { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+  .quota-fill.limited { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+  /* In-App Quota Limit Toast */
+  .quota-toast {
+    display: none;
+    max-width: 300px;
+    background: rgba(34, 18, 22, 0.96);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(248, 113, 113, 0.48);
+    border-radius: 14px;
+    padding: 12px 14px;
+    color: #fecaca;
+    font-size: 12.5px;
+    line-height: 1.55;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.48);
+  }
+
+  .quota-toast.open { display: block; }
+
+  .quota-toast-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #fca5a5;
+  }
+
+  .quota-toast-close {
+    background: transparent;
+    border: none;
+    color: #fca5a5;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 2px;
+  }
+
+  .quota-switch-btn {
+    margin-top: 8px;
+    width: 100%;
+    background: rgba(248, 113, 113, 0.16);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    color: #fff;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .quota-switch-btn:hover { background: rgba(248, 113, 113, 0.28); }
+
+  @media (max-width: 820px) {
+    .quota-hud {
+      position: static;
+      align-items: center;
+      margin: 6px 16px 0;
+    }
+  }
+
+  /* Center Stage */
+  .stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 20px 64px;
+    max-width: 680px;
+    width: 100%;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  /* Greeting (No logo, pure typography) */
+  .greeting-wrap {
+    margin-bottom: 44px;
+    min-height: 76px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .greeting-text {
+    font-size: clamp(26px, 4.2vw, 38px);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: #f8fafc;
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+
+  .greeting-text.fading {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  .lang-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    opacity: 0.72;
+  }
+
+  /* Spinning Greeting Donut (active while AI is generating) */
+  .greeting-wrap.is-spinning .greeting-text,
+  .greeting-wrap.is-spinning .lang-tag {
+    display: none;
+  }
+
+  .greeting-donut {
+    display: none;
+    position: relative;
+    width: 280px;
+    height: 280px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .greeting-wrap.is-spinning .greeting-donut {
+    display: flex;
+  }
+
+  .donut-svg {
+    width: 280px;
+    height: 280px;
+    overflow: visible;
+    animation: donutSpin 14s linear infinite;
+    filter: drop-shadow(0 0 26px rgba(107, 142, 35, 0.34));
+  }
+
+  .donut-ring {
+    fill: rgba(107, 142, 35, 0.06);
+    stroke: rgba(132, 169, 77, 0.28);
+    stroke-width: 1.2;
+    stroke-dasharray: 4 5;
+  }
+
+  .donut-inner-ring {
+    fill: none;
+    stroke: rgba(132, 169, 77, 0.18);
+    stroke-width: 1;
+  }
+
+  .donut-text {
+    fill: #edf7db;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    transition: opacity 0.35s ease;
+  }
+
+  .donut-text.fading,
+  .donut-center-lang.fading {
+    opacity: 0;
+  }
+
+  .donut-center-lang {
+    position: absolute;
+    font-family: 'Times New Roman', Georgia, serif;
+    font-size: 34px;
+    font-weight: 600;
+    color: #b7d484;
+    opacity: 0.92;
+    user-select: none;
+    text-shadow: 0 0 18px rgba(132, 169, 77, 0.45);
+    transition: opacity 0.35s ease;
+  }
+
+  @keyframes donutSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Floating Stacked Oval Pill Stack (3 options) */
+  .pill-stack {
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .mode-pill {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 26px;
+    border-radius: 999px;
+    background: rgba(24, 25, 31, 0.9);
+    border: 1px solid var(--border);
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease;
+  }
+
+  .mode-pill:hover {
+    transform: translateY(-2px);
+    background: rgba(34, 37, 48, 0.96);
+    border-color: rgba(132, 169, 77, 0.48);
+    box-shadow: 0 10px 30px rgba(74, 112, 38, 0.30);
+  }
+
+  .mode-pill:active { transform: translateY(0); }
+
+  .mode-pill.primary-mock {
+    border-color: rgba(132, 169, 77, 0.40);
+  }
+
+  .pill-left {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .pill-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+
+  .pill-desc {
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+
+  .pill-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: #d9eab8;
+    background: rgba(107, 142, 35, 0.20);
+    border: 1px solid rgba(132, 169, 77, 0.34);
+    padding: 5px 12px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  /* Progress State */
+  .progress-card {
+    display: none;
+    width: 100%;
+    max-width: 460px;
+    background: rgba(20, 21, 27, 0.92);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 26px 28px;
+  }
+
+  .progress-card.active { display: block; }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 6%;
+    background: linear-gradient(90deg, #6b8e23, #a3c668);
+    border-radius: 999px;
+    transition: width 0.35s ease;
+  }
+
+  .progress-label {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', 'Noto Sans Thai', monospace;
+  }
+
+  /* Result State: Two Centered PDF Oval Pills (Top = Exam, Bottom = Answer Key) */
+  .result-panel {
+    display: none;
+    width: 100%;
+    max-width: 480px;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .result-panel.active { display: flex; }
+
+  .pdf-pill-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(24, 25, 31, 0.94);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 8px 10px 8px 22px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .pdf-pill-row:hover {
+    border-color: rgba(132, 169, 77, 0.48);
+    box-shadow: 0 8px 26px rgba(74, 112, 38, 0.28);
+  }
+
+  .pdf-main-link {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: var(--text);
+    text-align: left;
+    padding: 8px 0;
+  }
+
+  .pdf-btn-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mini-action {
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 9px 15px;
+    font-size: 12.5px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .mini-action:hover {
+    background: rgba(132, 169, 77, 0.22);
+    border-color: rgba(132, 169, 77, 0.55);
+  }
+
+  .summary-strip {
+    width: 100%;
+    margin-top: 8px;
+    background: rgba(18, 19, 24, 0.82);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 14px 18px;
+    text-align: left;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12.5px;
+  }
+
+  .summary-row:last-child { border-bottom: none; }
+
+  .stars-ui {
+    color: #fbbf24;
+    letter-spacing: 1px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .error-banner {
+    display: none;
+    width: 100%;
+    max-width: 460px;
+    margin-top: 16px;
+    padding: 14px 18px;
+    border-radius: 18px;
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    color: #fecaca;
+    font-size: 13px;
+    text-align: left;
+  }
+
+  .error-banner.active { display: block; }
+
+  /* Interactive Single Question Card (QUESTION mode — inline web quiz, no PDF) */
+  .single-q-card {
+    display: none;
+    width: 100%;
+    max-width: 640px;
+    background: rgba(20, 21, 27, 0.94);
+    border: 1px solid var(--border);
+    border-radius: 26px;
+    padding: 26px 28px;
+    text-align: left;
+  }
+
+  .single-q-card.active { display: block; }
+
+  .sq-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 13px;
+  }
+
+  .sq-stem {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #f3f4f6;
+    margin-bottom: 20px;
+  }
+
+  .sq-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .choice-pill {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.16s ease;
+  }
+
+  .choice-pill:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-hover);
+  }
+
+  .choice-pill.selected {
+    background: rgba(132, 169, 77, 0.20);
+    border-color: rgba(132, 169, 77, 0.68);
+  }
+
+  .choice-pill.correct {
+    background: rgba(52, 211, 153, 0.16);
+    border-color: rgba(52, 211, 153, 0.65);
+  }
+
+  .choice-pill.wrong {
+    background: rgba(248, 113, 113, 0.16);
+    border-color: rgba(248, 113, 113, 0.65);
+  }
+
+  .choice-idx {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    flex-shrink: 0;
+  }
+
+  .sq-numeric-wrap {
+    margin-bottom: 18px;
+  }
+
+  .sq-numeric-input {
+    width: 100%;
+    background: #0a0b0f;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 13px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    outline: none;
+  }
+
+  .sq-numeric-input:focus { border-color: var(--accent); }
+
+  .sq-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .primary-pill-btn {
+    background: rgba(107, 142, 35, 0.28);
+    border: 1px solid rgba(132, 169, 77, 0.60);
+    color: #fff;
+    border-radius: 999px;
+    padding: 10px 22px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .primary-pill-btn:hover { background: rgba(107, 142, 35, 0.42); }
+
+  .sq-feedback {
+    display: none;
+    margin-top: 18px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .sq-feedback.active { display: block; }
+  .sq-verdict { font-weight: 600; font-size: 15px; margin-bottom: 8px; }
+  .sq-verdict.ok { color: var(--ok); }
+  .sq-verdict.bad { color: var(--danger); }
+  .sq-verdict.info { color: #b7d484; }
+  .sq-trap {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: #fcd34d;
+    font-size: 13px;
+  }
+
+  /* Modals (API Keys + PDF Preview) */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    z-index: 50;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-backdrop.open { display: flex; }
+
+  .modal-box {
+    background: #121319;
+    border: 1px solid var(--border-hover);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 480px;
+    padding: 24px;
+    color: var(--text);
+  }
+
+  .modal-box.preview-box {
+    max-width: 980px;
+    height: 88vh;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .modal-head h3 { font-size: 16px; font-weight: 600; }
+
+  .close-x {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  .close-x:hover { color: var(--text); border-color: var(--border-hover); }
+
+  .key-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+    text-align: left;
+  }
+
+  .key-row label {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .key-input-wrap {
+    display: flex;
+    gap: 8px;
+  }
+
+  .key-input {
+    flex: 1;
+    background: #0a0b0f;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 9px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    outline: none;
+  }
+
+  .key-input:focus { border-color: var(--accent); }
+
+  .preview-frame {
+    flex: 1;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: #ffffff;
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Top Bar: Model & Multi-API Switcher -->
+  <header class="top-bar">
+    <div class="model-pill" title="เลือกโมเดลตาม API ที่ตั้งค่าไว้">
+      <span id="providerDot" class="status-dot"></span>
+      <select id="modelSelect" class="model-select" aria-label="เลือกโมเดล AI"></select>
+    </div>
+    <button id="openKeysBtn" class="icon-btn" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      API Keys
+    </button>
+  </header>
+
+  <!-- Top-Right Real-Time Quota Gauge & Limit Alert -->
+  <aside id="quotaHud" class="quota-hud" aria-live="polite">
+    <button id="quotaReopenBtn" class="quota-reopen-btn" type="button" onclick="toggleQuotaHud(false)" title="เปิดดูสถานะโควตา AI">
+      <span id="quotaMiniDot" class="quota-dot"></span>
+      <span>โควตา AI</span>
+    </button>
+    <div id="quotaPill" class="quota-pill" title="สถานะโควตาและกิจกรรม AI แบบเรียลไทม์">
+      <div class="quota-model-row">
+        <span id="quotaDot" class="quota-dot"></span>
+        <span id="quotaProvider" class="quota-provider-tag">API</span>
+        <span style="opacity:0.45;">•</span>
+        <span id="quotaModelName" class="quota-model-name">—</span>
+        <button type="button" class="quota-hide-btn" onclick="toggleQuotaHud(true)" title="ซ่อนแถบโควตา" aria-label="ซ่อนแถบโควตา">&times;</button>
+      </div>
+      <div class="quota-top-row">
+        <span id="quotaTitle" style="font-weight:500; color:var(--text);">โควตา AI</span>
+        <span id="quotaNum" class="quota-num">—</span>
+      </div>
+      <div class="quota-track">
+        <div id="quotaBarFill" class="quota-fill"></div>
+      </div>
+      <div class="quota-activity-box">
+        <div id="quotaActivityRow" class="quota-activity-row">
+          <span class="quota-spinner"></span>
+          <span id="quotaActivityText">พร้อมใช้งาน</span>
+        </div>
+        <div id="quotaActivityDetail" class="quota-activity-detail">เลือกโหมดด้านล่างเพื่อเริ่มสร้างข้อสอบ</div>
+        <div id="quotaActivityLog" class="quota-activity-log"></div>
+      </div>
+    </div>
+    <div id="quotaToast" class="quota-toast" role="alert">
+      <div class="quota-toast-head">
+        <span id="quotaToastTitle">ติดลิมิตโควตา AI</span>
+        <button type="button" class="quota-toast-close" onclick="dismissQuotaToast()" aria-label="ปิดการแจ้งเตือน">&times;</button>
+      </div>
+      <div id="quotaToastBody"></div>
+      <button id="quotaSwitchBtn" type="button" class="quota-switch-btn" style="display:none;"></button>
+    </div>
+  </aside>
+
+  <!-- Main Centered Workspace -->
+  <main class="stage">
+    <!-- Multilingual Greeting (No Logo; turns into Spinning Text Donut while running) -->
+    <div id="greetingWrap" class="greeting-wrap">
+      <h1 id="greetingText" class="greeting-text">เราจะเริ่มจากตรงไหนก่อนดี</h1>
+      <span id="greetingLang" class="lang-tag">TH</span>
+      <div id="greetingDonut" class="greeting-donut" aria-label="กำลังสร้างข้อสอบ">
+        <svg class="donut-svg" viewBox="0 0 220 220" aria-hidden="true">
+          <defs>
+            <path id="donutTextPath" d="M 110,110 m -78,0 a 78,78 0 1,1 156,0 a 78,78 0 1,1 -156,0" />
+          </defs>
+          <circle class="donut-ring" cx="110" cy="110" r="102" />
+          <circle class="donut-inner-ring" cx="110" cy="110" r="52" />
+          <text id="donutTextEl" class="donut-text">
+            <textPath id="donutTextPathEl" href="#donutTextPath" startOffset="0%" textLength="480" lengthAdjust="spacing">3.1415926535897932384626433832795028</textPath>
+          </text>
+        </svg>
+        <span id="donutCenterLang" class="donut-center-lang">&pi;</span>
+      </div>
+    </div>
+
+    <!-- 3 Floating Oval Pills -->
+    <section id="modeStack" class="pill-stack" aria-label="เลือกโหมดสร้างข้อสอบ">
+      <button class="mode-pill" type="button" onclick="startGeneration('question')">
+        <span class="pill-left">
+          <span class="pill-title">QUESTION</span>
+          <span class="pill-desc">สุ่มโจทย์ 1 ข้อ ทำและตรวจคำตอบบนหน้าเว็บทันที</span>
+        </span>
+        <span class="pill-badge">1 ข้อ • Interactive</span>
+      </button>
+
+      <button class="mode-pill" type="button" onclick="startGeneration('mini_test')">
+        <span class="pill-left">
+          <span class="pill-title">MINI-TEST</span>
+          <span class="pill-desc">แบบทดสอบ 15 ข้อ สุ่มกระจายให้หลากหลายบทที่สุด</span>
+        </span>
+        <span class="pill-badge">15 ข้อ</span>
+      </button>
+
+      <button class="mode-pill primary-mock" type="button" onclick="startGeneration('mock_test')">
+        <span class="pill-left">
+          <span class="pill-title">MOCK-TEST</span>
+          <span class="pill-desc">ข้อสอบจำลอง A-Level 70 จริงจากโมเดลทำนาย (Blueprint ครบ 30 ข้อ)</span>
+        </span>
+        <span class="pill-badge">30 ข้อ • A-Level 70</span>
+      </button>
+    </section>
+
+    <!-- Live Generation Progress -->
+    <section id="progressCard" class="progress-card">
+      <div class="progress-header">
+        <span id="progressTitle">กำลังสร้างข้อสอบ...</span>
+        <span id="progressCount" style="font-family:'JetBrains Mono',monospace;">0 / 1</span>
+      </div>
+      <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+      <div id="progressLabel" class="progress-label">เริ่มต้นระบบ SymPy Verification Gate...</div>
+    </section>
+
+    <!-- Result State: Top = Exam PDF, Bottom = Solutions PDF -->
+    <section id="resultPanel" class="result-panel">
+      <div class="pdf-pill-row">
+        <a id="examDownloadMain" class="pdf-main-link" href="#" download>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a3c668" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span class="pill-left">
+            <span class="pill-title" style="font-size:14.5px; letter-spacing:0.02em;">ตัวข้อสอบ (Exam Paper PDF)</span>
+            <span class="pill-desc">ฟอร์แมตมาตรฐาน A-Level รหัสวิชา 61 • พร้อมดาวความยาก 1–5</span>
+          </span>
+        </a>
+        <div class="pdf-btn-group">
+          <button type="button" class="mini-action" onclick="openPreview('exam')">Preview</button>
+          <a id="examDownloadBtn" class="mini-action" href="#" download>โหลด PDF</a>
+        </div>
+      </div>
+
+      <div class="pdf-pill-row">
+        <a id="solDownloadMain" class="pdf-main-link" href="#" download>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span class="pill-left">
+            <span class="pill-title" style="font-size:14.5px; letter-spacing:0.02em;">เฉลยละเอียด (Answer Key PDF)</span>
+            <span class="pill-desc">ตารางคำตอบ + วิธีทำทีละขั้น + จุดหลอก (SymPy-Verified)</span>
+          </span>
+        </a>
+        <div class="pdf-btn-group">
+          <button type="button" class="mini-action" onclick="openPreview('solutions')">Preview</button>
+          <a id="solDownloadBtn" class="mini-action" href="#" download>โหลด PDF</a>
+        </div>
+      </div>
+
+      <div id="summaryStrip" class="summary-strip"></div>
+
+      <button type="button" class="icon-btn" style="margin-top:6px;" onclick="resetToHome()">
+        สร้างข้อสอบชุดใหม่
+      </button>
+    </section>
+
+    <!-- Interactive Single Question Panel (QUESTION mode) -->
+    <section id="singleQuestionCard" class="single-q-card">
+      <div class="sq-meta">
+        <span id="sqChapterTag" style="font-weight:500;">บทเรียน</span>
+        <span id="sqStars" class="stars-ui">★★★☆☆</span>
+      </div>
+      <div id="sqStem" class="sq-stem"></div>
+      <div id="sqChoices" class="sq-choices"></div>
+      <div id="sqNumericWrap" class="sq-numeric-wrap" style="display:none;">
+        <input id="sqNumericInput" class="sq-numeric-input" type="text" placeholder="พิมพ์คำตอบตัวเลข เช่น 12 หรือ 3.5 ..." />
+      </div>
+      <div class="sq-actions">
+        <button type="button" class="primary-pill-btn" onclick="checkSingleAnswer()">ตรวจคำตอบ</button>
+        <button type="button" class="mini-action" onclick="revealSingleSolution()">ดูเฉลยเลย</button>
+        <button type="button" class="icon-btn" style="margin-left:auto;" onclick="startGeneration('question')">สุ่มข้อถัดไป</button>
+        <button type="button" class="icon-btn" onclick="resetToHome()">กลับหน้าหลัก</button>
+      </div>
+      <div id="sqFeedback" class="sq-feedback">
+        <div id="sqVerdict" class="sq-verdict"></div>
+        <div id="sqSolution"></div>
+        <div id="sqTrap" class="sq-trap"></div>
+      </div>
+    </section>
+
+    <div id="errorBanner" class="error-banner"></div>
+  </main>
+</div>
+
+<!-- API Keys Modal -->
+<div id="keysModal" class="modal-backdrop">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>ตั้งค่า API Keys (Multi-Provider)</h3>
+      <button class="close-x" type="button" onclick="closeKeysModal()">&times;</button>
+    </div>
+    <div id="keysFormBody"></div>
+  </div>
+</div>
+
+<!-- PDF Preview Modal -->
+<div id="previewModal" class="modal-backdrop">
+  <div class="modal-box preview-box">
+    <div class="modal-head">
+      <h3 id="previewTitle">ตัวอย่างเอกสาร A-Level 61</h3>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <a id="previewDownloadLink" class="mini-action" href="#" download>ดาวน์โหลด PDF</a>
+        <button class="close-x" type="button" onclick="closePreviewModal()">&times;</button>
+      </div>
+    </div>
+    <iframe id="previewFrame" class="preview-frame" title="Exam PDF Preview"></iframe>
+  </div>
+</div>
+
+<script>
+  // 7 Languages x 3 Greetings = 21 Randomized Greetings
+  const GREETINGS = [
+    { lang: "TH", text: "เราจะเริ่มจากตรงไหนก่อนดี" },
+    { lang: "TH", text: "พร้อมลุยข้อสอบ A-Level คณิต 1 วันนี้ไหม" },
+    { lang: "TH", text: "เลือกโหมดด้านล่าง แล้วมาวัดฝีมือกันเลย" },
+
+    { lang: "DE", text: "Wo sollen wir anfangen?" },
+    { lang: "DE", text: "Bereit für die nächste Mathe-Challenge?" },
+    { lang: "DE", text: "Lass uns heute eine neue Prüfung simulieren" },
+
+    { lang: "EN", text: "Where should we start?" },
+    { lang: "EN", text: "Ready to tackle A-Level Math today?" },
+    { lang: "EN", text: "Pick a test mode and let's begin" },
+
+    { lang: "FR", text: "Par où commençons-nous ?" },
+    { lang: "FR", text: "Prêt pour un défi de mathématiques ?" },
+    { lang: "FR", text: "Choisis un mode d'examen pour démarrer" },
+
+    { lang: "RU", text: "С чего начнём сегодня?" },
+    { lang: "RU", text: "Готовы решить новый тест по математике?" },
+    { lang: "RU", text: "Выберите режим и приступим к задаче" },
+
+    { lang: "ZH", text: "我们从哪里开始？" },
+    { lang: "ZH", text: "准备好挑战今天的数学模拟题了吗？" },
+    { lang: "ZH", text: "选一种模式，马上开始演练" },
+
+    { lang: "JA", text: "どこから始めましょうか？" },
+    { lang: "JA", text: "今日の数学模試に挑戦しますか？" },
+    { lang: "JA", text: "モードを選んで始めましょう" }
+  ];
+
+  let lastGreetingIdx = -1;
+  let isGenerating = false;
+  let providersCache = [];
+  let currentJobData = null;
+  let pollTimer = null;
+  let lastQuotaData = null;
+  let quotaResetTargetMs = 0;
+  let quotaToastDismissedFor = "";
+
+  function formatCountdownTh(totalSec) {
+    const s = Math.max(0, Math.floor(totalSec));
+    if (s <= 0) return "";
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const rem = s % 60;
+    if (h > 0) return `${h}ชม. ${m}น.`;
+    if (m > 0) return `${m}น. ${rem}วิ.`;
+    return `${rem}วิ.`;
+  }
+
+  function toggleQuotaHud(collapse) {
+    const hud = document.getElementById("quotaHud");
+    hud.classList.toggle("collapsed", Boolean(collapse));
+    try { localStorage.setItem("quota_hud_collapsed", collapse ? "1" : "0"); } catch (_) {}
+  }
+
+  function setHudActivity(state, text, detail = "", recent = []) {
+    const row = document.getElementById("quotaActivityRow");
+    const txt = document.getElementById("quotaActivityText");
+    const det = document.getElementById("quotaActivityDetail");
+    const logEl = document.getElementById("quotaActivityLog");
+    if (!row || !txt) return;
+    const isBusy = state === "working" || state === "waiting";
+    row.classList.toggle("active", isBusy);
+    txt.textContent = text || "พร้อมใช้งาน";
+    if (det) det.textContent = detail || (isBusy ? "กำลังประมวลผล..." : "เลือกโหมดด้านล่างเพื่อเริ่มสร้างข้อสอบ");
+    if (logEl && Array.isArray(recent)) {
+      logEl.innerHTML = recent.map(line => {
+        const div = document.createElement("div");
+        div.textContent = line;
+        return div.outerHTML;
+      }).join("");
+    }
+  }
+
+  function dismissQuotaToast() {
+    document.getElementById("quotaToast").classList.remove("open");
+    if (lastQuotaData) {
+      quotaToastDismissedFor = `${lastQuotaData.provider}::${lastQuotaData.model}::${lastQuotaData.status}`;
+    }
+  }
+
+  function renderQuotaHud(q, alternatives) {
+    const pill = document.getElementById("quotaPill");
+    const dot = document.getElementById("quotaDot");
+    const miniDot = document.getElementById("quotaMiniDot");
+    const providerEl = document.getElementById("quotaProvider");
+    const modelEl = document.getElementById("quotaModelName");
+    const title = document.getElementById("quotaTitle");
+    const num = document.getElementById("quotaNum");
+    const fill = document.getElementById("quotaBarFill");
+    const toast = document.getElementById("quotaToast");
+    const toastTitle = document.getElementById("quotaToastTitle");
+    const toastBody = document.getElementById("quotaToastBody");
+    const switchBtn = document.getElementById("quotaSwitchBtn");
+
+    if (q.activity && q.activity.text) {
+      setHudActivity(q.activity.state, q.activity.text, q.activity.detail || "", q.activity.recent || []);
+    }
+
+    const providerLabels = {
+      gemini: "Gemini",
+      openai: "OpenAI",
+      anthropic: "Claude",
+      openrouter: "OpenRouter",
+      ollama: "Ollama"
+    };
+    providerEl.textContent = providerLabels[q.provider] || q.provider || "API";
+    modelEl.textContent = q.model || "—";
+
+    pill.classList.remove("state-low", "state-limited");
+    dot.classList.remove("low", "limited");
+    if (miniDot) miniDot.classList.remove("low", "limited");
+    fill.classList.remove("low", "limited");
+
+    const pct = Math.max(0, Math.min(100, Number(q.pct ?? 100)));
+    fill.style.width = `${pct}%`;
+
+    const remSec = quotaResetTargetMs > 0 ? Math.max(0, Math.round((quotaResetTargetMs - Date.now()) / 1000)) : 0;
+    const cdText = formatCountdownTh(remSec);
+
+    if (q.status === "unlimited") {
+      title.textContent = "ฟรีไม่จำกัด";
+      num.textContent = "Max ∞";
+      pill.title = q.message_th;
+      toast.classList.remove("open");
+      return;
+    }
+
+    if (q.rpd_limit == null) {
+      title.textContent = "Pay-as-you-go";
+      num.textContent = `ใช้ ${q.rpd_used || 0} วันนี้`;
+      pill.title = q.message_th;
+      toast.classList.remove("open");
+      return;
+    }
+
+    if (q.status === "exhausted_rpd" || q.status === "limited_rpm") {
+      pill.classList.add("state-limited");
+      dot.classList.add("limited");
+      if (miniDot) miniDot.classList.add("limited");
+      fill.classList.add("limited");
+      title.textContent = q.status === "exhausted_rpd"
+        ? `หมด (0/${q.rpd_limit} วันนี้)`
+        : `ติดลิมิต RPM (${q.rpm_used}/${q.rpm_limit})`;
+      num.textContent = cdText ? `รอ ${cdText}` : `0/${q.rpd_limit}`;
+      pill.title = `${q.message_th} • Max ${q.rpd_limit}/วัน • ${q.rpm_limit}/นาที`;
+
+      const toastKey = `${q.provider}::${q.model}::${q.status}`;
+      if (quotaToastDismissedFor !== toastKey) {
+        toastTitle.textContent = q.status === "exhausted_rpd"
+          ? `โควตาฟรีรายวันของ ${q.model} หมดแล้ว`
+          : `ติดลิมิตรายนาทีของ ${q.model} ชั่วคราว`;
+        toastBody.textContent = cdText
+          ? `จะรีเซ็ตในอีกประมาณ ${cdText} — คุณสามารถสลับไปใช้โมเดลอื่นต่อได้ทันที`
+          : `แนะนำสลับไปใช้โมเดลอื่นที่เมนูด้านบนเพื่อใช้งานต่อทันที`;
+        if (alternatives && alternatives.length > 0) {
+          const alt = alternatives[0];
+          switchBtn.style.display = "block";
+          switchBtn.textContent = `สลับไปใช้ ${alt.model} ทันที`;
+          switchBtn.onclick = () => {
+            document.getElementById("modelSelect").value = alt.value;
+            updateProviderDot();
+            toast.classList.remove("open");
+            refreshQuota(true);
+          };
+        } else {
+          switchBtn.style.display = "none";
+        }
+        toast.classList.add("open");
+      }
+      return;
+    }
+
+    if (q.status === "low") {
+      pill.classList.add("state-low");
+      dot.classList.add("low");
+      if (miniDot) miniDot.classList.add("low");
+      fill.classList.add("low");
+    }
+    title.textContent = `เหลือ ${q.rpd_remaining}/${q.rpd_limit}`;
+    num.textContent = `RPM ${q.rpm_used}/${q.rpm_limit}`;
+    pill.title = `${q.message_th} • Max ${q.rpd_limit}/วัน • ${q.rpm_limit}/นาที`;
+    toast.classList.remove("open");
+  }
+
+  async function refreshQuota(resetDismiss = false) {
+    const val = document.getElementById("modelSelect").value;
+    if (!val) return;
+    const [provider, model] = val.split("::");
+    if (resetDismiss) quotaToastDismissedFor = "";
+    try {
+      const res = await fetch(`/api/quota?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      lastQuotaData = data.quota;
+      lastQuotaData._alternatives = data.alternatives || [];
+      quotaResetTargetMs = data.quota.reset_in_seconds > 0
+        ? Date.now() + data.quota.reset_in_seconds * 1000
+        : 0;
+      renderQuotaHud(data.quota, data.alternatives || []);
+    } catch (_) {}
+  }
+
+  const PI_DIGITS =
+    "3.14159265358979323846264338327950288419716939937510" +
+    "58209749445923078164062862089986280348253421170679" +
+    "82148086513282306647093844609550582231725359408128" +
+    "48111745028410270193852110555964462294895493038196" +
+    "44288109756659334461284756482337867831652712019091";
+
+  function pickRandomPiRing(count = 35) {
+    // 35% chance to start at "3.14159..." so π is immediately recognizable, else random slice
+    const maxStart = PI_DIGITS.length - count;
+    const start = Math.random() < 0.35 ? 0 : Math.floor(Math.random() * maxStart);
+    return PI_DIGITS.slice(start, start + count);
+  }
+
+  function updateDonutPiDigits() {
+    const tp = document.getElementById("donutTextPathEl");
+    const txtEl = document.getElementById("donutTextEl");
+    const centerLang = document.getElementById("donutCenterLang");
+    if (!tp || !txtEl) return;
+
+    tp.textContent = pickRandomPiRing(35);
+    tp.setAttribute("textLength", "480");
+    tp.setAttribute("lengthAdjust", "spacing");
+    txtEl.style.fontSize = "21px";
+    if (centerLang) centerLang.textContent = "π";
+  }
+
+  function setGreetingDonutMode(spinning) {
+    isGenerating = Boolean(spinning);
+    const wrap = document.getElementById("greetingWrap");
+    if (!wrap) return;
+    if (isGenerating) {
+      wrap.classList.add("is-spinning");
+      updateDonutPiDigits();
+    } else {
+      wrap.classList.remove("is-spinning");
+    }
+  }
+
+  function rotateGreeting() {
+    const elText = document.getElementById("greetingText");
+    const elLang = document.getElementById("greetingLang");
+    const donutText = document.getElementById("donutTextEl");
+    let idx = Math.floor(Math.random() * GREETINGS.length);
+    if (idx === lastGreetingIdx) idx = (idx + 1) % GREETINGS.length;
+    lastGreetingIdx = idx;
+
+    if (isGenerating && donutText) {
+      donutText.classList.add("fading");
+      setTimeout(() => {
+        elText.textContent = GREETINGS[idx].text;
+        elLang.textContent = GREETINGS[idx].lang;
+        updateDonutPiDigits();
+        donutText.classList.remove("fading");
+      }, 320);
+      return;
+    }
+
+    elText.classList.add("fading");
+    setTimeout(() => {
+      elText.textContent = GREETINGS[idx].text;
+      elLang.textContent = GREETINGS[idx].lang;
+      elText.classList.remove("fading");
+    }, 320);
+  }
+
+  async function loadProviders() {
+    const res = await fetch("/api/providers");
+    const data = await res.json();
+    providersCache = data.providers || [];
+
+    const select = document.getElementById("modelSelect");
+    const prevVal = select.value;
+    select.innerHTML = "";
+
+    let defaultVal = null;
+    const readyProviders = providersCache.filter(p => p.configured);
+    if (readyProviders.length === 0) {
+      const emptyOpt = document.createElement("option");
+      emptyOpt.value = "";
+      emptyOpt.textContent = "ยังไม่ได้เชื่อมต่อ API Key";
+      emptyOpt.dataset.configured = "0";
+      select.appendChild(emptyOpt);
+    } else {
+      readyProviders.forEach(p => {
+        const group = document.createElement("optgroup");
+        group.label = `${p.label} ● Ready`;
+        p.models.forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = `${p.id}::${m}`;
+          opt.textContent = `${p.label} — ${m}`;
+          opt.dataset.configured = "1";
+          if (!defaultVal) defaultVal = opt.value;
+          group.appendChild(opt);
+        });
+        select.appendChild(group);
+      });
+    }
+
+    if (prevVal && [...select.options].some(o => o.value === prevVal)) {
+      select.value = prevVal;
+    } else if (defaultVal) {
+      select.value = defaultVal;
+    }
+    updateProviderDot();
+    renderKeysModalBody();
+    refreshQuota();
+  }
+
+  function updateProviderDot() {
+    const select = document.getElementById("modelSelect");
+    const opt = select.selectedOptions[0];
+    const dot = document.getElementById("providerDot");
+    const ok = opt && opt.dataset.configured === "1";
+    dot.classList.toggle("off", !ok);
+  }
+
+  function renderKeysModalBody() {
+    const body = document.getElementById("keysFormBody");
+    body.innerHTML = providersCache.map(p => `
+      <div class="key-row">
+        <label>
+          <span>${p.label} (<code>${p.env_var}</code>)</span>
+          <span style="color:${p.configured ? '#34d399' : '#9ca3af'}">${p.configured ? 'Configured' : 'Not set'}</span>
+        </label>
+        <div class="key-input-wrap">
+          <input id="key_${p.id}" class="key-input" type="${p.id === 'ollama' ? 'text' : 'password'}"
+                 placeholder="${p.id === 'ollama' ? 'http://localhost:11434' : 'วาง API Key ที่นี่...'}" />
+          <button type="button" class="mini-action" onclick="saveProviderKey('${p.id}')">บันทึก</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function saveProviderKey(providerId) {
+    const input = document.getElementById(`key_${providerId}`);
+    await fetch("/api/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: providerId, api_key: input.value })
+    });
+    input.value = "";
+    await loadProviders();
+  }
+
+  function showError(msg) {
+    const banner = document.getElementById("errorBanner");
+    banner.style.whiteSpace = "pre-line";
+    banner.style.lineHeight = "1.65";
+    banner.textContent = msg;
+    banner.classList.add("active");
+  }
+
+  function hideError() {
+    document.getElementById("errorBanner").classList.remove("active");
+  }
+
+  async function startGeneration(mode) {
+    hideError();
+    const val = document.getElementById("modelSelect").value;
+    if (!val) return showError("กรุณาเลือกโมเดลก่อนเริ่มสร้างข้อสอบ");
+    const [provider, model] = val.split("::");
+
+    document.getElementById("modeStack").style.display = "none";
+    document.getElementById("resultPanel").classList.remove("active");
+    document.getElementById("singleQuestionCard").classList.remove("active");
+    document.getElementById("progressCard").classList.add("active");
+    setGreetingDonutMode(true);
+    document.getElementById("progressTitle").textContent = `กำลังสร้าง ${mode.toUpperCase().replace("_", "-")}`;
+    document.getElementById("progressFill").style.width = "8%";
+    document.getElementById("progressLabel").textContent = `เชื่อมต่อ ${provider} (${model})...`;
+
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, provider, model, target_year_be: 2570 })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to start job");
+      }
+      const { job_id } = await res.json();
+      pollJob(job_id);
+    } catch (err) {
+      resetToHome();
+      showError(err.message);
+    }
+  }
+
+  function pollJob(jobId) {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        const data = await res.json();
+        const pct = Math.max(8, Math.round((data.completed / Math.max(1, data.total)) * 100));
+        document.getElementById("progressCount").textContent = `${data.completed} / ${data.total}`;
+        document.getElementById("progressFill").style.width = `${data.status === "done" ? 100 : pct}%`;
+        document.getElementById("progressLabel").textContent = data.current_label || data.status;
+
+        if (data.status === "done") {
+          clearInterval(pollTimer);
+          currentJobData = data;
+          renderResult(data);
+          refreshQuota();
+        } else if (data.status === "error") {
+          clearInterval(pollTimer);
+          resetToHome();
+          showError(data.error || "ไม่สามารถสร้างข้อสอบได้ กรุณาลองใหม่อีกครั้งครับ");
+          refreshQuota(true);
+        } else {
+          refreshQuota();
+        }
+      } catch (err) {
+        clearInterval(pollTimer);
+        resetToHome();
+        showError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์บนเครื่องได้\nแนะนำ: ตรวจสอบว่าเซิร์ฟเวอร์ยังทำงานอยู่ แล้วรีเฟรชหน้าเว็บครับ");
+      }
+    }, 1200);
+  }
+
+  function renderStars(n) {
+    const k = Math.max(1, Math.min(5, Number(n) || 3));
+    return "★".repeat(k) + "☆".repeat(5 - k);
+  }
+
+  let activeSingleQuestion = null;
+  let selectedChoiceIdx = null;
+
+  function renderMath(el) {
+    if (typeof renderMathInElement === "function") {
+      renderMathInElement(el, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false },
+          { left: "\\(", right: "\\)", display: false },
+          { left: "\\[", right: "\\]", display: true }
+        ],
+        throwOnError: false
+      });
+    }
+  }
+
+  function renderResult(data) {
+    setGreetingDonutMode(false);
+    document.getElementById("progressCard").classList.remove("active");
+
+    if (data.mode === "question" && data.single_question) {
+      renderSingleQuestion(data.single_question);
+      return;
+    }
+
+    document.getElementById("resultPanel").classList.add("active");
+
+    const examDl = `${data.exam_pdf_url}?download=1`;
+    const solDl = `${data.solutions_pdf_url}?download=1`;
+    document.getElementById("examDownloadMain").href = examDl;
+    document.getElementById("examDownloadBtn").href = examDl;
+    document.getElementById("solDownloadMain").href = solDl;
+    document.getElementById("solDownloadBtn").href = solDl;
+
+    const strip = document.getElementById("summaryStrip");
+    strip.innerHTML = (data.questions_summary || []).map(q => `
+      <div class="summary-row">
+        <span><strong>ข้อ ${q.slot_number}</strong> • ${q.chapter_th} <span style="color:#6b7280">(${q.question_format === 'mcq_5' ? 'ปรนัย' : 'เติมคำ'})</span></span>
+        <span class="stars-ui" title="ความยาก ${q.difficulty_stars}/5 ดาว">${renderStars(q.difficulty_stars)}</span>
+      </div>
+    `).join("");
+  }
+
+  function renderSingleQuestion(q) {
+    activeSingleQuestion = q;
+    selectedChoiceIdx = null;
+
+    const card = document.getElementById("singleQuestionCard");
+    document.getElementById("sqChapterTag").textContent = `${q.chapter_th || q.chapter_id} • ${q.question_format === "mcq_5" ? "ปรนัย 5 ตัวเลือก" : "เติมคำตอบตัวเลข"}`;
+    document.getElementById("sqStars").textContent = renderStars(q.difficulty_stars);
+    document.getElementById("sqStem").textContent = q.stem_latex;
+
+    const choicesEl = document.getElementById("sqChoices");
+    const numWrap = document.getElementById("sqNumericWrap");
+    const numInput = document.getElementById("sqNumericInput");
+    numInput.value = "";
+
+    if (q.question_format === "mcq_5") {
+      numWrap.style.display = "none";
+      choicesEl.style.display = "flex";
+      choicesEl.innerHTML = (q.choices_latex || []).map((ch, idx) => `
+        <button type="button" class="choice-pill" data-idx="${idx + 1}" onclick="selectChoice(${idx + 1})">
+          <span class="choice-idx">${idx + 1}</span>
+          <span class="choice-body"></span>
+        </button>
+      `).join("");
+      [...choicesEl.querySelectorAll(".choice-body")].forEach((span, idx) => {
+        const raw = String(q.choices_latex[idx] || "").trim();
+        span.textContent = (!raw.includes("$") && /[\\^_]/.test(raw)) ? `$${raw}$` : raw;
+      });
+    } else {
+      choicesEl.style.display = "none";
+      choicesEl.innerHTML = "";
+      numWrap.style.display = "block";
+    }
+
+    document.getElementById("sqFeedback").classList.remove("active");
+    card.classList.add("active");
+    renderMath(card);
+  }
+
+  function selectChoice(idx) {
+    selectedChoiceIdx = String(idx);
+    document.querySelectorAll("#sqChoices .choice-pill").forEach(btn => {
+      btn.classList.toggle("selected", btn.dataset.idx === selectedChoiceIdx);
+    });
+  }
+
+  function showSingleSolution(verdictClass, verdictText) {
+    if (!activeSingleQuestion) return;
+    const q = activeSingleQuestion;
+    const fb = document.getElementById("sqFeedback");
+    const vEl = document.getElementById("sqVerdict");
+    vEl.className = `sq-verdict ${verdictClass}`;
+    vEl.textContent = verdictText;
+
+    document.getElementById("sqSolution").textContent = `วิธีทำ: ${q.solution_steps_th || "-"}`;
+    document.getElementById("sqTrap").textContent = `จุดหลอกที่ต้องระวัง: ${q.key_trap || "-"} (SymPy verified: ${q.sympy_computed_answer})`;
+    fb.classList.add("active");
+    renderMath(fb);
+  }
+
+  function checkSingleAnswer() {
+    if (!activeSingleQuestion) return;
+    const q = activeSingleQuestion;
+
+    if (q.question_format === "mcq_5") {
+      if (!selectedChoiceIdx) return showError("กรุณาเลือกตัวเลือก 1–5 ก่อนกดตรวจคำตอบ หรือกด 'ดูเฉลยเลย'");
+      hideError();
+      const isCorrect = selectedChoiceIdx === String(q.answer);
+      document.querySelectorAll("#sqChoices .choice-pill").forEach(btn => {
+        btn.classList.remove("correct", "wrong");
+        if (btn.dataset.idx === String(q.answer)) btn.classList.add("correct");
+        else if (btn.dataset.idx === selectedChoiceIdx && !isCorrect) btn.classList.add("wrong");
+      });
+      showSingleSolution(
+        isCorrect ? "ok" : "bad",
+        isCorrect ? `ถูกต้อง! คำตอบคือตัวเลือกที่ ${q.answer}` : `ยังไม่ถูก — คำตอบที่ถูกคือตัวเลือกที่ ${q.answer}`
+      );
+      return;
+    }
+
+    const raw = document.getElementById("sqNumericInput").value.trim().replace(/,/g, "");
+    if (!raw) return showError("กรุณาพิมพ์คำตอบตัวเลขก่อนกดตรวจ หรือกด 'ดูเฉลยเลย'");
+    hideError();
+    const userNum = Number(raw);
+    const ansNum = Number(String(q.answer).replace(/,/g, ""));
+    const isCorrect = !Number.isNaN(userNum) && !Number.isNaN(ansNum) && Math.abs(userNum - ansNum) <= 1e-3;
+    showSingleSolution(
+      isCorrect ? "ok" : "bad",
+      isCorrect ? `ถูกต้อง! คำตอบคือ ${q.answer}` : `ยังไม่ถูก — คำตอบที่ถูกคือ ${q.answer}`
+    );
+  }
+
+  function revealSingleSolution() {
+    if (!activeSingleQuestion) return;
+    hideError();
+    const q = activeSingleQuestion;
+    if (q.question_format === "mcq_5") {
+      document.querySelectorAll("#sqChoices .choice-pill").forEach(btn => {
+        if (btn.dataset.idx === String(q.answer)) btn.classList.add("correct");
+      });
+    }
+    const label = q.question_format === "mcq_5" ? `ตัวเลือกที่ ${q.answer}` : q.answer;
+    showSingleSolution("info", `เฉลย: ${label}`);
+  }
+
+  function openPreview(docType) {
+    if (!currentJobData) return;
+    const isExam = docType === "exam";
+    const pdfUrl = isExam ? currentJobData.exam_pdf_url : currentJobData.solutions_pdf_url;
+    document.getElementById("previewTitle").textContent = isExam
+      ? "ตัวอย่างตัวข้อสอบ (A-Level รหัสวิชา 61)"
+      : "ตัวอย่างเฉลยละเอียด (SymPy-Verified)";
+    document.getElementById("previewDownloadLink").href = `${pdfUrl}?download=1`;
+    document.getElementById("previewFrame").src = pdfUrl;
+    document.getElementById("previewModal").classList.add("open");
+  }
+
+  function closePreviewModal() {
+    document.getElementById("previewModal").classList.remove("open");
+    document.getElementById("previewFrame").src = "about:blank";
+  }
+
+  function openKeysModal() { document.getElementById("keysModal").classList.add("open"); }
+  function closeKeysModal() { document.getElementById("keysModal").classList.remove("open"); }
+
+  function resetToHome() {
+    setGreetingDonutMode(false);
+    document.getElementById("progressCard").classList.remove("active");
+    document.getElementById("resultPanel").classList.remove("active");
+    document.getElementById("singleQuestionCard").classList.remove("active");
+    document.getElementById("modeStack").style.display = "flex";
+    hideError();
+    rotateGreeting();
+  }
+
+  document.getElementById("modelSelect").addEventListener("change", () => {
+    updateProviderDot();
+    refreshQuota(true);
+  });
+  document.getElementById("openKeysBtn").addEventListener("click", openKeysModal);
+
+  try {
+    if (localStorage.getItem("quota_hud_collapsed") === "1") toggleQuotaHud(true);
+  } catch (_) {}
+
+  rotateGreeting();
+  setInterval(rotateGreeting, 5500);
+  setInterval(() => {
+    if (lastQuotaData && quotaResetTargetMs > 0) {
+      renderQuotaHud(lastQuotaData, lastQuotaData._alternatives || []);
+      if (Date.now() >= quotaResetTargetMs) {
+        quotaResetTargetMs = 0;
+        refreshQuota(true);
+      }
+    }
+  }, 1000);
+  setInterval(() => refreshQuota(), 4000);
+  loadProviders();
+</script>
+</body>
+</html>
