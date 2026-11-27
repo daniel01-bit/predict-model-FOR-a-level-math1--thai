@@ -420,7 +420,7 @@ RED_FLAG_PHRASES = (
 
 
 def sanitize_latex_text(text: str) -> str:
-    """Repair common JSON-eaten LaTeX control characters (\\t -> \\times/\\text/\\theta, \\f -> \\frac, \\r -> \\rightarrow)."""
+    """Repair common JSON-eaten LaTeX control characters without corrupting \\neq, \\neg, \\notin, etc."""
     if not text:
         return text
     text = text.replace("\t", r"\t").replace("\x0c", r"\f").replace("\x08", r"\b").replace("\r", r"\r")
@@ -429,7 +429,9 @@ def sanitize_latex_text(text: str) -> str:
     text = re.sub(r"(?<![a-zA-Z\\])ext\{", r"\\text{", text)
     text = re.sub(r"(?<!\\)\bightarrow\b", r"\\rightarrow", text)
     text = re.sub(r"(?<!\\)\bheta\b", r"\\theta", text)
-    text = text.replace("\\n", "\n")
+    text = re.sub(r"(?<!\\)\borall\b", r"\\forall", text)
+    # Only convert literal \n when NOT followed by an ASCII letter (preserves \neq, \neg, \notin, \nu, \nabla)
+    text = re.sub(r"\\n(?![a-zA-Z])", "\n", text)
     return text.strip()
 
 

@@ -257,6 +257,55 @@ def test_alevel_sympy_gate_and_latex_auto_repair():
     assert sanitize_latex_text("rac{1}{2} + heta") == r"\frac{1}{2} + \theta"
 
 
+def test_special_math_and_logic_symbols_preserved_end_to_end():
+    from src.pdf_renderer import render_exam_html
+    from src.sympy_seeds import generate_verified_seed
+    from src.verifier import check_latex_and_choice_quality, sanitize_latex_text
+
+    # Ensure \neq, \neg, \notin, \forall, \exists, \land, \lor, \rightarrow, \leftrightarrow, \equiv, \sim, sets, vectors, matrices all survive intact
+    stem = (
+        r"กำหนด $\forall x \in \mathbb{R}$ ที่ $x \neq 0$ และ $x \notin \emptyset$ "
+        r"พิจารณาประพจน์ $(\neg p \lor q) \leftrightarrow (p \rightarrow q) \equiv (\sim p \land r)$ "
+        r"และ $\exists y \in A \cup B \cap C$ โดยที่ $\vec{u} \times \vec{v}$ และ $\begin{bmatrix} 1 & 2 \\ 3 & 4 \end{bmatrix}$"
+    )
+    cleaned = sanitize_latex_text(stem)
+    for token in (
+        r"\forall", r"\exists", r"\neq", r"\notin", r"\emptyset",
+        r"\neg", r"\lor", r"\land", r"\rightarrow", r"\leftrightarrow", r"\equiv", r"\sim",
+        r"\cup", r"\cap", r"\vec{u}", r"\times", r"\begin{bmatrix}",
+    ):
+        assert token in cleaned, f"Missing symbol after sanitize_latex_text: {token}"
+
+    assert check_latex_and_choice_quality(cleaned, QuestionFormat.MCQ_5, ["0", "1", "2", "3", "4"]) is None
+
+    # Verify _seed_logic emits proper LaTeX symbols (no bare ASCII -> or <->)
+    logic_seed = generate_verified_seed("logic", seed=42)
+    assert logic_seed is not None
+    assert r"\rightarrow" in logic_seed.params_description_th
+    assert r"\land" in logic_seed.params_description_th
+    assert r"\lor" in logic_seed.params_description_th
+    assert r"\leftrightarrow" in logic_seed.params_description_th
+    assert r"\sim" in logic_seed.params_description_th
+
+    # Verify HTML/PDF template keeps all LaTeX commands intact for KaTeX
+    html_out = render_exam_html(
+        [{
+            "slot_number": 1,
+            "chapter_id": "logic",
+            "chapter_th": "ตรรกศาสตร์เบื้องต้น",
+            "sub_skill_id": "truth_table_equivalence",
+            "question_format": "mcq_5",
+            "difficulty_stars": 3,
+            "stem_latex": cleaned,
+            "choices_latex": ["0", "1", "2", "3", "4"],
+            "answer": "3",
+        }],
+        mode="mini_test",
+        target_year_be=2570,
+    )
+    assert r"\neq" in html_out and r"\neg" in html_out and r"\forall" in html_out and r"\leftrightarrow" in html_out
+
+
 def test_llm_router_circuit_breaker_and_provider_guards():
     from src.llm_router import _is_daily_quota_exhausted, _parse_retry_after_seconds
 

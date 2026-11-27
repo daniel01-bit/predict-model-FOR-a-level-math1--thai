@@ -79,8 +79,9 @@ def _seed_logic(rng: random.Random) -> MathSeed:
         f"assert 0 <= ANSWER <= 4"
     )
     desc = (
-        f"กำหนดให้ประพจน์ p, q, r มีค่าความจริงเป็น {p_th}, {q_th}, {r_th} ตามลำดับ "
-        f"พิจารณาข้อความ 4 ข้อต่อไปนี้: (ก) p -> q, (ข) p ^ ~r, (ค) q <-> r, (ง) (p v q) -> r "
+        f"กำหนดให้ประพจน์ $p, q, r$ มีค่าความจริงเป็น {p_th}, {q_th}, {r_th} ตามลำดับ "
+        f"พิจารณาข้อความ 4 ข้อต่อไปนี้: (ก) $p \\rightarrow q$, (ข) $p \\land \\sim r$, "
+        f"(ค) $q \\leftrightarrow r$, (ง) $(p \\lor q) \\rightarrow r$ "
         f"-> ถามว่ามีข้อความที่มีค่าความจริงเป็น 'จริง' กี่ข้อ (ใช้ตัวเลือก 0, 1, 2, 3, 4 เท่านั้น; คำตอบแน่นอน = {ans})"
     )
     return MathSeed("logic", desc, str(ans), code, suggested_stars=2)
@@ -106,25 +107,60 @@ def _seed_real_numbers(rng: random.Random) -> MathSeed:
 
 
 def _seed_functions(rng: random.Random) -> MathSeed:
-    # Quadratic profit/revenue maximization: R(x) = -a*(x - h)^2 + k on [0, 2h]
-    a = rng.choice([2, 3, 5])
-    h = rng.randint(10, 25)
-    k = rng.randint(500, 1500)
-    # Ask ONE clear question only (maximum revenue/profit = k)
+    # 3-4 Star Reverse-Construction across 2 archetypes:
+    # (A) Closed-interval range [x1, x2] with interior vertex (verified via function_range)
+    # (B) Piecewise continuity at boundary x = c (verified via left/right limits == f(c))
+    if rng.random() < 0.5:
+        a = rng.choice([1, 2, 3])
+        h = rng.randint(2, 6)
+        k = rng.randint(1, 8)
+        x1 = h - rng.randint(2, 4)
+        x2 = h + rng.randint(1, 3)
+        b_lin = -2 * a * h
+        c_const = a * (h**2) + k
+        f_x1 = a * ((x1 - h) ** 2) + k
+        f_x2 = a * ((x2 - h) ** 2) + k
+        max_val = max(f_x1, f_x2)
+        min_val = k
+        ans = max_val - min_val
+        code = (
+            f"x = sp.Symbol('x', real=True)\n"
+            f"f = {a}*x**2 + ({b_lin})*x + ({c_const})\n"
+            f"rng_set = sp.calculus.util.function_range(f, x, sp.Interval({x1}, {x2}))\n"
+            f"assert isinstance(rng_set, sp.Interval)\n"
+            f"ANSWER = rng_set.sup - rng_set.inf\n"
+            f"assert ANSWER > 0"
+        )
+        desc = (
+            f"กำหนดฟังก์ชัน f(x) = {a}x^2 + ({b_lin})x + ({c_const}) บนช่วงปิด [{x1}, {x2}] "
+            f"(จุดยอดอยู่ภายในช่วงปิด ต้องเช็กทั้งจุดยอดและจุดปลายช่วง) "
+            f"-> จงหาผลต่างระหว่างค่าสูงสุดสัมบูรณ์และค่าต่ำสุดสัมบูรณ์ของ f บนช่วงนี้ (คำตอบแน่นอน = {ans}, 3-4 ดาว)"
+        )
+        return MathSeed("functions", desc, str(ans), code, suggested_stars=3)
+
+    # Archetype B: Piecewise continuity at x = c
+    c_pt = rng.randint(2, 5)
+    p = rng.choice([1, 2])
+    a_slope = rng.randint(2, 6)
+    k_val = rng.randint(3, 12)
+    b_shift = p * (c_pt**2) + k_val - a_slope * c_pt
+    ans = a_slope + k_val
     code = (
-        f"x = sp.Symbol('x', real=True)\n"
-        f"R = -{a}*(x - {h})**2 + {k}\n"
-        f"crit = sp.solve(sp.diff(R, x), x)[0]\n"
-        f"assert 0 <= crit <= {2 * h}\n"
-        f"ANSWER = R.subs(x, crit)"
+        f"x, k = sp.symbols('x k', real=True)\n"
+        f"f_left = {a_slope}*x + ({b_shift})\n"
+        f"f_right = {p}*x**2 + k\n"
+        f"L_left = sp.limit(f_left, x, {c_pt}, dir='-')\n"
+        f"L_right = sp.limit(f_right, x, {c_pt}, dir='+')\n"
+        f"sols = sp.solve(sp.Eq(L_left, L_right), k)\n"
+        f"assert len(sols) == 1\n"
+        f"ANSWER = sp.Integer({a_slope}) + sols[0]\n"
+        f"assert ANSWER > 0"
     )
-    b_lin = 2 * a * h
-    c_const = k - a * (h**2)
     desc = (
-        f"ฟังก์ชันกำไรจากการผลิตสินค้า x ชิ้นคือ R(x) = -{a}x^2 + {b_lin}x + ({c_const}) บาท สำหรับ 0 <= x <= {2 * h} "
-        f"-> ถามคำถามเดียวชัดเจน: จงหากำไรสูงสุดที่เป็นไปได้ (ห้ามถาม 2 คำถามซ้อน; คำตอบแน่นอน = {k})"
+        f"กำหนดฟังก์ชันแบ่งช่วง f(x) = {a_slope}x + ({b_shift}) เมื่อ x < {c_pt} และ f(x) = {p}x^2 + k เมื่อ x >= {c_pt} "
+        f"ถ้า f เป็นฟังก์ชันต่อเนื่องที่ x = {c_pt} จงหาค่าของ {a_slope} + k (คำตอบแน่นอน = {ans}, 3-4 ดาว)"
     )
-    return MathSeed("functions", desc, str(k), code, suggested_stars=2)
+    return MathSeed("functions", desc, str(ans), code, suggested_stars=4)
 
 
 def _seed_expo_log(rng: random.Random) -> MathSeed:
@@ -208,59 +244,135 @@ def _seed_matrices(rng: random.Random) -> MathSeed:
 
 
 def _seed_sequences_series(rng: random.Random) -> MathSeed:
-    # Infinite geometric series with guaranteed |r| < 1
+    # 3-4 Star Reverse-Construction across 2 archetypes:
+    # (A) Mixed arithmetic + geometric equation a_n + b_n = K: pick integer n > 0 FIRST, compute K
+    # (B) Convergent infinite geometric series with shifted start index (n=1 vs n=0)
+    if rng.random() < 0.5:
+        n_true = rng.randint(4, 7)
+        a1 = rng.randint(2, 6)
+        d = rng.randint(2, 5)
+        b1 = rng.choice([1, 2, 3])
+        r = 2
+        a_n = a1 + (n_true - 1) * d
+        b_n = b1 * (r ** (n_true - 1))
+        K = a_n + b_n
+        code = (
+            f"n_sols = [n for n in range(1, 20) if ({a1} + (n - 1)*{d}) + ({b1} * {r}**(n - 1)) == {K}]\n"
+            f"assert len(n_sols) == 1 and n_sols[0] > 0\n"
+            f"ANSWER = sp.Integer(n_sols[0])"
+        )
+        desc = (
+            f"กำหนดลำดับเลขคณิต a_n มี a_1 = {a1}, ผลต่างร่วม d = {d} "
+            f"และลำดับเรขาคณิต b_n มี b_1 = {b1}, อัตราส่วนร่วม r = {r} "
+            f"ถ้าพบว่า a_n + b_n = {K} จงหาจำนวนเต็มบวก n (คำตอบแน่นอน = {n_true}, 3-4 ดาว)"
+        )
+        return MathSeed("sequences_series", desc, str(n_true), code, suggested_stars=4)
+
     num, den = rng.choice([(1, 2), (1, 3), (2, 3), (1, 4), (3, 4), (2, 5)])
-    a1 = (den - num) * rng.randint(2, 6)
-    val = sp.Rational(a1 * den, den - num)
+    # Sum_{n=1}^{inf} c * (num/den)^n = c * (num/den) / (1 - num/den) = c * num / (den - num)
+    c_mult = (den - num) * rng.randint(2, 6)
+    val = sp.Rational(c_mult * num, den - num)
     ans = str(int(val))
     code = (
-        f"a1, r = sp.Integer({a1}), sp.Rational({num}, {den})\n"
+        f"c, r = sp.Integer({c_mult}), sp.Rational({num}, {den})\n"
         f"assert abs(r) < 1\n"
-        f"ANSWER = a1 / (1 - r)"
+        f"ANSWER = (c * r) / (1 - r)\n"
+        f"assert ANSWER > 0"
     )
     desc = (
-        f"อนุกรมเรขาคณิตอนันต์มีพจน์แรก a_1 = {a1} และอัตราส่วนร่วม r = {num}/{den} "
-        f"จงหาผลบวกของอนุกรมอนันต์นี้ (คำตอบแน่นอน = {ans})"
+        f"จงหาผลบวกของอนุกรมอนันต์ Sigma_{{n=1}}^{{infinity}} {c_mult} * ({num}/{den})^n "
+        f"(ระวังดัชนีเริ่มต้น n=1 ไม่ใช่ n=0; คำตอบแน่นอน = {ans}, 3 ดาว)"
     )
-    return MathSeed("sequences_series", desc, ans, code, suggested_stars=2)
+    return MathSeed("sequences_series", desc, ans, code, suggested_stars=3)
 
 
 def _seed_analytic_geometry(rng: random.Random) -> MathSeed:
-    triples = [(5, 4, 3), (5, 3, 4), (13, 12, 5), (10, 8, 6), (10, 6, 8)]
-    a, b, c = rng.choice(triples)
-    h, k = rng.randint(-4, 4), rng.randint(-4, 4)
-    ans = 2 * c
+    # 3-4 Star Pythagorean-Triple Conics (Ellipse focal triangle perimeter OR Hyperbola focal length)
+    if rng.random() < 0.5:
+        triples = [(5, 4, 3), (5, 3, 4), (13, 12, 5), (10, 8, 6), (17, 15, 8)]
+        a, b, c = rng.choice(triples)
+        h, k = rng.randint(-4, 4), rng.randint(-4, 4)
+        # Perimeter of triangle F1-P-F2 for any point P on the ellipse is strictly 2a + 2c
+        ans = 2 * a + 2 * c
+        code = (
+            f"a, b = sp.Integer({a}), sp.Integer({b})\n"
+            f"assert a > b > 0\n"
+            f"c = sp.sqrt(a**2 - b**2)\n"
+            f"assert c.is_integer and c > 0\n"
+            f"ANSWER = 2*a + 2*c"
+        )
+        desc = (
+            f"วงรีมีสมการ (x - ({h}))^2 / {a**2} + (y - ({k}))^2 / {b**2} = 1 มีจุดโฟกัสคือ F_1 และ F_2 "
+            f"ถ้า P เป็นจุดใดๆ บนวงรีนี้ที่ไม่ใช่จุดยอดบนแกนเอก จงหาความยาวรอบรูปของสามเหลี่ยม PF_1F_2 "
+            f"(ใช้สมบัติ PF_1 + PF_2 = 2a และ F_1F_2 = 2c; คำตอบแน่นอน = {ans}, 3-4 ดาว)"
+        )
+        return MathSeed("analytic_geometry", desc, str(ans), code, suggested_stars=4)
+
+    # Archetype B: Hyperbola with Pythagorean triple c^2 = a^2 + b^2
+    h_triples = [(3, 4, 5), (4, 3, 5), (5, 12, 13), (6, 8, 10), (8, 15, 17)]
+    a, b, c = rng.choice(h_triples)
+    h, k = rng.randint(-3, 3), rng.randint(-3, 3)
+    # Ask for 2c + 2a (sum of focal distance and transverse axis length, guaranteed positive integer)
+    ans = 2 * c + 2 * a
     code = (
         f"a, b = sp.Integer({a}), sp.Integer({b})\n"
-        f"assert a > b > 0\n"
-        f"c = sp.sqrt(a**2 - b**2)\n"
-        f"ANSWER = 2 * c"
+        f"c = sp.sqrt(a**2 + b**2)\n"
+        f"assert a > 0 and b > 0 and c.is_integer\n"
+        f"ANSWER = 2*c + 2*a"
     )
     desc = (
-        f"วงรีมีสมการ (x - ({h}))^2 / {a**2} + (y - ({k}))^2 / {b**2} = 1 "
-        f"จงหาระยะห่างระหว่างจุดโฟกัสทั้งสองของวงรีนี้ (คำตอบแน่นอน = {ans})"
+        f"ไฮเพอร์โบลามีสมการ (x - ({h}))^2 / {a**2} - (y - ({k}))^2 / {b**2} = 1 "
+        f"(ห้ามกำหนดจุดบนไฮเพอร์โบลาที่อยู่บนเส้นกำกับเด็ดขาด) "
+        f"จงหาผลบวกของระยะห่างระหว่างจุดโฟกัสทั้งสองกับความยาวแกนตามขวาง (คำตอบแน่นอน = {ans}, 3 ดาว)"
     )
     return MathSeed("analytic_geometry", desc, str(ans), code, suggested_stars=3)
 
 
 def _seed_vectors_3d(rng: random.Random) -> MathSeed:
-    # 3D cross product triangle area with exact integer result (e.g. u=(a,0,0), v=(b,c,0) rotated or integer cross)
-    u = (rng.randint(1, 4), rng.randint(-3, 3), rng.randint(1, 3))
-    v = (rng.randint(-3, 3), rng.randint(1, 4), rng.randint(-2, 3))
-    # Dot product u . (2u - v) is always a clean integer and avoids radical typos
-    dot_uv = u[0] * v[0] + u[1] * v[1] + u[2] * v[2]
-    norm_u2 = u[0] ** 2 + u[1] ** 2 + u[2] ** 2
-    ans = 2 * norm_u2 - dot_uv
-    code = (
-        f"u = sp.Matrix([{u[0]}, {u[1]}, {u[2]}])\n"
-        f"v = sp.Matrix([{v[0]}, {v[1]}, {v[2]}])\n"
-        f"ANSWER = u.dot(2*u - v)"
-    )
-    desc = (
-        f"กำหนดเวกเตอร์ในสามมิติ u = ({u[0]}, {u[1]}, {u[2]}) และ v = ({v[0]}, {v[1]}, {v[2]}) "
-        f"จงหาค่าของ u . (2u - v) (คำตอบแน่นอน = {ans})"
-    )
-    return MathSeed("vectors_3d", desc, str(ans), code, suggested_stars=2)
+    # 3-4 Star 3D Vectors: Parallelepiped Volume |u . (v x w)| > 0 OR Parallelogram Area^2 |u x v|^2 > 0
+    if rng.random() < 0.5:
+        for _ in range(30):
+            u = [rng.randint(1, 4), rng.randint(-2, 3), rng.randint(0, 3)]
+            v = [rng.randint(-2, 3), rng.randint(1, 4), rng.randint(-2, 2)]
+            w = [rng.randint(0, 3), rng.randint(-2, 2), rng.randint(1, 4)]
+            vol = abs(int(sp.Matrix([u, v, w]).det()))
+            if 4 <= vol <= 80:
+                code = (
+                    f"u = sp.Matrix({u})\n"
+                    f"v = sp.Matrix({v})\n"
+                    f"w = sp.Matrix({w})\n"
+                    f"vol = sp.Abs(u.dot(v.cross(w)))\n"
+                    f"assert vol > 0\n"
+                    f"ANSWER = vol"
+                )
+                desc = (
+                    f"กำหนดเวกเตอร์ในสามมิติ u = ({u[0]}, {u[1]}, {u[2]}), v = ({v[0]}, {v[1]}, {v[2]}), "
+                    f"และ w = ({w[0]}, {w[1]}, {w[2]}) (ห้ามเปลี่ยนเลขเวกเตอร์ในเฉลยเด็ดขาด) "
+                    f"จงหาปริมาตรของทรงสี่เหลี่ยมด้านขนานที่มีเวกเตอร์ทั้งสามเป็นด้านประกอบ (คำตอบแน่นอน = {vol}, 4 ดาว)"
+                )
+                return MathSeed("vectors_3d", desc, str(vol), code, suggested_stars=4)
+
+    for _ in range(30):
+        u = [rng.randint(1, 4), rng.randint(-2, 3), rng.randint(1, 3)]
+        v = [rng.randint(-2, 3), rng.randint(1, 4), rng.randint(-2, 3)]
+        cx = sp.Matrix(u).cross(sp.Matrix(v))
+        area_sq = int(cx.dot(cx))
+        if area_sq > 0:
+            code = (
+                f"u = sp.Matrix({u})\n"
+                f"v = sp.Matrix({v})\n"
+                f"cx = u.cross(v)\n"
+                f"area_sq = cx.dot(cx)\n"
+                f"assert area_sq > 0\n"
+                f"ANSWER = area_sq"
+            )
+            desc = (
+                f"กำหนดเวกเตอร์ในสามมิติ u = ({u[0]}, {u[1]}, {u[2]}) และ v = ({v[0]}, {v[1]}, {v[2]}) "
+                f"จงหาค่ากำลังสองของพื้นที่รูปสี่เหลี่ยมด้านขนานที่มี u และ v เป็นด้านประชิด (|u x v|^2; คำตอบแน่นอน = {area_sq}, 3-4 ดาว)"
+            )
+            return MathSeed("vectors_3d", desc, str(area_sq), code, suggested_stars=3)
+
+    raise RuntimeError("Failed to generate non-degenerate 3D vector seed")
 
 
 def _seed_statistics(rng: random.Random) -> MathSeed:
