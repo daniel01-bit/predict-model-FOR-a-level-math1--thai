@@ -415,8 +415,39 @@ RED_FLAG_PHRASES = (
     "ขัดแย้งกัน",
     "ไม่สอดคล้อง",
     "หาคำตอบไม่ได้",
+    "ผิดพลาด",
+    "ให้ดูจาก",
     "adjust the problem",
 )
+
+STEM_ONLY_FORBIDDEN_PHRASES = (
+    "ขั้นที่ 1",
+    "ขั้นที่ 2",
+    "ขั้นที่ 3",
+    "ขั้นตอนที่ 1",
+    "ขั้นตอนที่ 2",
+)
+
+
+def _has_repetition_loop(text: str) -> str | None:
+    """Detect LLM self-correction / repetition loops inside a question stem."""
+    if not text:
+        return None
+    if len(text) > 1200:
+        return f"Stem abnormally long ({len(text)} chars), likely hallucination/repetition loop"
+    compact = re.sub(r"\s+", " ", text).strip()
+    if len(compact) < 90:
+        return None
+    # Check every 20-char window (step=1, <0.1ms) — catches any repeated phrase at any offset
+    seen_pos: dict[str, list[int]] = {}
+    for i in range(0, len(compact) - 20):
+        chunk = compact[i : i + 20]
+        positions = seen_pos.setdefault(chunk, [])
+        if not positions or i - positions[-1] >= 20:
+            positions.append(i)
+            if len(positions) >= 3:
+                return f"Repetition loop detected in stem ({chunk!r} repeated {len(positions)}+ times)"
+    return None
 
 
 def sanitize_latex_text(text: str) -> str:
@@ -430,6 +461,8 @@ def sanitize_latex_text(text: str) -> str:
     text = re.sub(r"(?<!\\)\bightarrow\b", r"\\rightarrow", text)
     text = re.sub(r"(?<!\\)\bheta\b", r"\\theta", text)
     text = re.sub(r"(?<!\\)\borall\b", r"\\forall", text)
+    # Convert Python/SymPy conj(x) / conjugate(x) to standard IPST LaTeX \overline{x}
+    text = re.sub(r"(?:\\text\{)?\b(?:conj|conjugate)\b\}?\s*\(([^()]+)\)", r"\\overline{\1}", text)
     # Only convert literal \n when NOT followed by an ASCII letter (preserves \neq, \neg, \notin, \nu, \nabla)
     text = re.sub(r"\\n(?![a-zA-Z])", "\n", text)
     return text.strip()
@@ -561,6 +594,14 @@ def check_latex_and_choice_quality(
         if flag in combined_prose:
             return f"AI hedging/apology red-flag phrase detected: {flag!r}"
 
+    for stem_flag in STEM_ONLY_FORBIDDEN_PHRASES:
+        if stem_flag in stem_latex:
+            return f"Unnatural step scaffolding ({stem_flag!r}) leaked into stem_latex"
+
+    rep_err = _has_repetition_loop(stem_latex)
+    if rep_err:
+        return rep_err
+
     # Block accidental Lao Unicode characters (U+0E80-U+0EFF) mixed into Thai text (e.g. 'ຄ້າ')
     if re.search(r"[\u0E80-\u0EFF]", combined_prose):
         return "Lao script character detected in Thai math text"
@@ -575,6 +616,7 @@ def check_latex_and_choice_quality(
         for bad_pat in (
             r"(?<![a-zA-Z\\])imes(?![a-zA-Z])",
             r"(?<![a-zA-Z\\])rac\{",
+            r"(?<![a-zA-Z\\])eq\s*[\-\+]?\d",
             r"(?<!\\)\bightarrow\b",
             r"(?<!\\)\bext\{",
             r"(?<!\\)\bheta\b",

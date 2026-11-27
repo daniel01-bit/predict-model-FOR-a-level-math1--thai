@@ -305,6 +305,12 @@ def test_special_math_and_logic_symbols_preserved_end_to_end():
     )
     assert r"\neq" in html_out and r"\neg" in html_out and r"\forall" in html_out and r"\leftrightarrow" in html_out
 
+    # Verify conj(z_2) / conjugate(z) auto-converts to standard IPST \overline{...}
+    assert sanitize_latex_text(r"$|z_1^2 \cdot conj(z_2)|$") == r"$|z_1^2 \cdot \overline{z_2}|$"
+    assert sanitize_latex_text("conjugate(z)") == r"\overline{z}"
+    cx_seed = generate_verified_seed("complex_numbers", seed=42)
+    assert cx_seed is not None and "conj(" not in cx_seed.params_description_th
+
 
 def test_quota_gauge_auto_resets_when_reset_window_expires():
     import time
@@ -409,6 +415,20 @@ def test_llm_router_circuit_breaker_and_provider_guards():
     assert r"$3 \times 3$" in q6_clean
     assert r"$\det(3A^2B^{-1})$" in q6_clean
     assert q6_clean.count("$") % 2 == 0
+
+    # 3-level difficulty mode contract (1=A-Level, 2=+50%, 3=+125%)
+    import pytest
+    from pydantic import ValidationError
+    from src.generator import DIFFICULTY_LEVEL_PROFILES, get_difficulty_profile
+    from src.server import GenerateRequest
+
+    assert set(DIFFICULTY_LEVEL_PROFILES.keys()) == {1, 2, 3}
+    assert get_difficulty_profile(2)["thinking_budget"] > get_difficulty_profile(1)["thinking_budget"]
+    assert get_difficulty_profile(3)["thinking_budget"] > get_difficulty_profile(2)["thinking_budget"]
+    req_lv3 = GenerateRequest(mode="mini_test", difficulty_level=3)
+    assert req_lv3.difficulty_level == 3
+    with pytest.raises(ValidationError):
+        GenerateRequest(mode="mini_test", difficulty_level=4)
     assert _is_daily_quota_exhausted("GenerateRequestsPerDayPerProjectPerModel-FreeTier") is True
     assert _is_daily_quota_exhausted("Generate content requests per day limit exceeded on Free Tier. Please retry in 2h40m58s.") is True
     assert _is_daily_quota_exhausted("GenerateRequestsPerMinutePerProjectPerModel-FreeTier") is False

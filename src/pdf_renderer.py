@@ -52,9 +52,50 @@ def _stars_html(stars: int) -> str:
     return f'<span class="stars" title="ความยาก {n}/5 ดาว">{"★" * n}{"☆" * (5 - n)}</span>'
 
 
-_LATEX_CMD_RE = re.compile(
-    r"\\(?:frac\{[^{}]+\}\{[^{}]+\}|sqrt\{[^{}]+\}|infty|pi|theta|alpha|beta|gamma|sigma|mu|lambda|Delta|times|cdot|pm|le|leq|ge|geq|neq|approx|to|rightarrow|leftrightarrow|land|lor|neg|sim|forall|exists|in|notin|subset|cup|cap|ln|log|sin|cos|tan|arcsin|arccos|arctan|det|sum|int)\b"
+# Brace-argument commands have NO trailing \b (since '}' is non-word); symbol commands keep trailing \b.
+_LATEX_BRACE_CMD = r"\\(?:frac|dfrac|tfrac)\{[^{}]+\}\{[^{}]+\}|\\(?:sqrt|vec|hat|bar|overline|mathbf|mathrm|text)\{[^{}]+\}"
+_LATEX_WORD_CMD = (
+    r"\\(?:infty|pi|theta|alpha|beta|gamma|sigma|mu|lambda|Delta|times|cdot|pm|le|leq|ge|geq|neq|approx|"
+    r"to|rightarrow|leftrightarrow|land|lor|neg|sim|forall|exists|in|notin|subset|cup|cap|ln|log|sin|cos|tan|"
+    r"arcsin|arccos|arctan|det|sum|int)\b"
 )
+# Match full bare math equations containing at least one LaTeX command (e.g. "\frac{(x-4)^2}{169} + \frac{(y+1)^2}{144} = 1")
+_BARE_MATH_EXPR_RE = re.compile(
+    rf"(?:[A-Za-z0-9\(\)\[\]\+\-\*/=\^_,\.\s]*?(?:{_LATEX_BRACE_CMD}|{_LATEX_WORD_CMD})(?:[A-Za-z0-9\(\)\[\]\{{\}}\+\-\*/=\^_,\.\s\\]*?(?:{_LATEX_BRACE_CMD}|{_LATEX_WORD_CMD}))*[A-Za-z0-9\(\)\[\]\+\-\*/=\^_\.]*(?:\s*[=<>≤≥]\s*[-\+]?[A-Za-z0-9\.\(\)\^_]+)?)"
+)
+_SINGLE_LATEX_CMD_RE = re.compile(rf"(?:{_LATEX_BRACE_CMD}|{_LATEX_WORD_CMD})")
+_BARE_MATH_HINT_RE = re.compile(rf"(?:{_LATEX_BRACE_CMD}|{_LATEX_WORD_CMD}|[A-Za-z0-9\)]\s*[\^_]\s*[\{{\-\+A-Za-z0-9]|!=)")
+
+
+def _wrap_prose_segment(seg: str) -> str:
+    # 1) Unwrap accidental \text{...} written outside $...$ (which otherwise splits braces across Thai text -> red KaTeX!)
+    if r"\text{" in seg:
+        for _ in range(3):
+            nxt = re.sub(r"\\text\{([^{}]*)\}", r"\1", seg)
+            if nxt == seg:
+                break
+            seg = nxt
+
+    if "\\" not in seg and "^" not in seg and "_" not in seg and "!=" not in seg:
+        return seg
+
+    # 2) Split on Thai characters so we only wrap clean non-Thai math spans
+    chunks = re.split(r"([\u0E00-\u0E7F]+)", seg)
+    for idx in range(0, len(chunks), 2):
+        part = chunks[idx]
+        if not _BARE_MATH_HINT_RE.search(part):
+            continue
+        lead_ws = part[: len(part) - len(part.lstrip())]
+        trail_ws = part[len(part.rstrip()) :]
+        core = part.strip()
+        if not core:
+            continue
+        # Only wrap if braces are balanced (never feed unbalanced { or } into KaTeX)
+        if core.count("{") != core.count("}"):
+            continue
+        core = core.replace("!=", r"\neq ")
+        chunks[idx] = f"{lead_ws}${core}${trail_ws}"
+    return "".join(chunks)
 
 
 def _auto_wrap_bare_latex(text: str, is_choice: bool = False) -> str:
@@ -70,12 +111,13 @@ def _auto_wrap_bare_latex(text: str, is_choice: bool = False) -> str:
     # Split on existing $...$ / $$...$$ segments so we never double-wrap valid math
     parts = re.split(r"(\$\$[\s\S]*?\$\$|\$[^$]+\$)", text)
     for i in range(0, len(parts), 2):
-        parts[i] = _LATEX_CMD_RE.sub(lambda m: f"${m.group(0)}$", parts[i])
+        parts[i] = _wrap_prose_segment(parts[i])
     return "".join(parts)
 
 
 def _escape_keep_latex(text: str, is_choice: bool = False) -> str:
-    wrapped = _auto_wrap_bare_latex(text, is_choice=is_choice)
+    cleaned = re.sub(r"(?:\\text\{)?\b(?:conj|conjugate)\b\}?\s*\(([^()]+)\)", r"\\overline{\1}", text)
+    wrapped = _auto_wrap_bare_latex(cleaned, is_choice=is_choice)
     return html.escape(wrapped).replace("\n", "<br>")
 
 

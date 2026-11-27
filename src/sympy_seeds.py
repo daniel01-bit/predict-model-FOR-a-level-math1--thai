@@ -220,7 +220,7 @@ def _seed_complex_numbers(rng: random.Random) -> MathSeed:
     )
     desc = (
         f"กำหนดจำนวนเชิงซ้อน z_1 = {a1} + {b1}i และ z_2 = {a2} - {b2}i "
-        f"จงหาค่าของ |z_1^{n_pow} * conj(z_2)| (คำตอบแน่นอน = {ans}, ระดับความยาก 2-3 ดาว)"
+        f"จงหาค่าของ $|z_1^{{{n_pow}}} \\cdot \\overline{{z_2}}|$ (คำตอบแน่นอน = {ans}, ระดับความยาก 2-3 ดาว)"
     )
     return MathSeed("complex_numbers", desc, str(ans), code, suggested_stars=2)
 
@@ -496,13 +496,124 @@ _SEEDERS = {
 }
 
 
-def generate_verified_seed(chapter_id: str, seed: int | None = None) -> MathSeed | None:
-    """Return a SymPy-preverified parameter seed covering all 16 Syllabus 2560 chapters."""
+def escalate_seed_for_level(base: MathSeed, difficulty_level: int, rng: random.Random) -> MathSeed:
+    """Deterministically chain Stage-2 / Stage-3 SymPy transformations for Level 2 (+50%) and Level 3 (+125%).
+
+    Keeps 100% SymPy-verified ground-truth math BEFORE the LLM writes the Thai word problem,
+    eliminating mental-arithmetic mismatches on harder multi-step levels.
+    """
+    if difficulty_level <= 1:
+        return base
+    try:
+        base_expr = sp.sympify(base.exact_answer)
+        base_val = float(sp.N(base_expr))
+    except Exception:
+        return base
+
+    if not (abs(base_val) <= 200 and abs(base_val * 10 - round(base_val * 10)) < 1e-6):
+        return base
+
+    if difficulty_level == 2:
+        a_coef = rng.choice([2, 3])
+        b_coef = rng.randint(2, 7)
+        c_shift = rng.randint(5, 19)
+        if abs(base_val) <= 35 and base_expr.is_integer:
+            stage2_expr = sp.simplify(a_coef * (base_expr**2) - b_coef * base_expr + c_shift)
+            if 0 <= float(sp.N(stage2_expr)) <= 9000:
+                ans_str = str(int(stage2_expr))
+                code = (
+                    f"{base.sympy_code}\n"
+                    f"_k_stage1 = ANSWER\n"
+                    f"ANSWER = sp.simplify({a_coef}*(_k_stage1**2) - {b_coef}*_k_stage1 + {c_shift})\n"
+                    f"assert ANSWER >= 0"
+                )
+                desc = (
+                    f"[Level 2 — โจทย์เชื่อมโยงหลายชั้นแบบ สสวท. (ห้ามเขียนคำว่า 'ขั้นที่ 1/2' ลงในตัวโจทย์)]\n"
+                    f"  เงื่อนไขฐาน (กำหนดค่าตัวแปรกลาง k): {base.params_description_th}\n"
+                    f"  เป้าหมายปลายทาง (ผูกต่อเป็นประโยคเดียวอย่างเป็นธรรมชาติ): "
+                    f"ให้ถามหาค่าของ {a_coef}k^2 - {b_coef}k + {c_shift} "
+                    f"(คำตอบสุดท้ายแน่นอน = {ans_str}, ความยาก 4 ดาว)"
+                )
+                return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=4)
+
+        m_coef = rng.choice([2, 4])
+        c_add = rng.randint(7, 25)
+        stage2_expr = sp.simplify(m_coef * sp.Abs(base_expr) + c_add)
+        stage2_val = float(sp.N(stage2_expr))
+        if 0 <= stage2_val <= 9999.99 and abs(stage2_val * 100 - round(stage2_val * 100)) < 1e-4:
+            ans_str = str(int(stage2_expr)) if stage2_expr.is_integer else f"{stage2_val:.2f}".rstrip("0").rstrip(".")
+            code = (
+                f"{base.sympy_code}\n"
+                f"_k_stage1 = ANSWER\n"
+                f"ANSWER = sp.simplify({m_coef}*sp.Abs(_k_stage1) + {c_add})\n"
+                f"assert ANSWER >= 0"
+            )
+            desc = (
+                f"[Level 2 — โจทย์เชื่อมโยงหลายชั้นแบบ สสวท. (ห้ามเขียนคำว่า 'ขั้นที่ 1/2' ลงในตัวโจทย์)]\n"
+                f"  เงื่อนไขฐาน (กำหนดค่าตัวแปรกลาง k): {base.params_description_th}\n"
+                f"  เป้าหมายปลายทาง (ผูกต่ออย่างเป็นธรรมชาติ): จงหาค่าของ {m_coef}|k| + {c_add} "
+                f"(คำตอบสุดท้ายแน่นอน = {ans_str}, ความยาก 4 ดาว)"
+            )
+            return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=4)
+        return base
+
+    # Level 3 (+125% harder / PAT1-Elite): 3-stage chained equation
+    p_off = rng.randint(3, 9)
+    q_add = rng.randint(11, 29)
+    if base_expr.is_integer and abs(base_val) <= 30:
+        abs_k = sp.Abs(base_expr)
+        stage3_expr = sp.simplify((abs_k + p_off) ** 2 + 2 * abs_k + q_add)
+        if 0 <= float(sp.N(stage3_expr)) <= 9000:
+            ans_str = str(int(stage3_expr))
+            code = (
+                f"{base.sympy_code}\n"
+                f"_k1 = sp.Abs(ANSWER)\n"
+                f"_m = _k1 + {p_off}\n"
+                f"ANSWER = sp.simplify(_m**2 + 2*_k1 + {q_add})\n"
+                f"assert ANSWER >= 0"
+            )
+            desc = (
+                f"[Level 3 — PAT1-Elite เชื่อมโยงเงื่อนไขซ้อนอย่างเนียนเป็นธรรมชาติ (ห้ามเขียนคำว่า 'ขั้นที่ 1/2/3' ในตัวโจทย์เด็ดขาด)]\n"
+                f"  เงื่อนไขฐาน (กำหนดค่า k): {base.params_description_th}\n"
+                f"  ความสัมพันธ์ซ้อน: พารามิเตอร์ m สัมพันธ์กับ k ตามสมการ m = |k| + {p_off}\n"
+                f"  เป้าหมายปลายทาง: ถามหาค่าของ m^2 + 2|k| + {q_add} "
+                f"(ผูกเงื่อนไขทั้งหมดเป็นประโยคภาษาไทยสละสลวยแบบ สสวท.; คำตอบสุดท้ายแน่นอน = {ans_str}, ความยาก 5 ดาว)"
+            )
+            return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=5)
+
+    m_coef = rng.choice([4, 5])
+    stage3_expr = sp.simplify(m_coef * sp.Abs(base_expr) + p_off * q_add)
+    stage3_val = float(sp.N(stage3_expr))
+    if 0 <= stage3_val <= 9999.99 and abs(stage3_val * 100 - round(stage3_val * 100)) < 1e-4:
+        ans_str = str(int(stage3_expr)) if stage3_expr.is_integer else f"{stage3_val:.2f}".rstrip("0").rstrip(".")
+        code = (
+            f"{base.sympy_code}\n"
+            f"_k1 = sp.Abs(ANSWER)\n"
+            f"ANSWER = sp.simplify({m_coef}*_k1 + {p_off * q_add})\n"
+            f"assert ANSWER >= 0"
+        )
+        desc = (
+            f"[Level 3 — PAT1-Elite เชื่อมโยงเงื่อนไขซ้อนอย่างเนียนเป็นธรรมชาติ (ห้ามเขียนคำว่า 'ขั้นที่ 1/2/3' ในตัวโจทย์เด็ดขาด)]\n"
+            f"  เงื่อนไขฐาน (กำหนดค่า k): {base.params_description_th}\n"
+            f"  เป้าหมายปลายทาง: ถามหาค่าของ {m_coef}|k| + {p_off * q_add} "
+            f"(คำตอบสุดท้ายแน่นอน = {ans_str}, ความยาก 5 ดาว)"
+        )
+        return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=5)
+    return base
+
+
+def generate_verified_seed(
+    chapter_id: str,
+    seed: int | None = None,
+    difficulty_level: int = 1,
+) -> MathSeed | None:
+    """Return a SymPy-preverified parameter seed covering all 16 Syllabus 2560 chapters across Levels 1-3."""
     fn = _SEEDERS.get(chapter_id)
     if fn is None:
         return None
     rng = random.Random(seed)
-    return fn(rng)
+    base = fn(rng)
+    return escalate_seed_for_level(base, difficulty_level=difficulty_level, rng=rng)
 
 
 _NON_NEGATIVE_CHAPTERS = {"sets", "logic", "counting", "probability", "prob_distributions"}
