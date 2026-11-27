@@ -15,8 +15,13 @@ from src.schema import QuestionFormat
 
 
 _WORKER_SCRIPT = r"""
-import ast, fractions, itertools, json, math, sys
+import ast, decimal, fractions, itertools, json, math, statistics, sys
 import sympy as sp
+
+if not hasattr(sp, "comb"):
+    sp.comb = sp.binomial
+if not hasattr(sp, "perm"):
+    sp.perm = lambda n, r=None: sp.factorial(n) if r is None else sp.factorial(n) // sp.factorial(n - r)
 
 ALLOWED_MODULES = {"sympy", "math", "itertools", "fractions", "statistics", "decimal"}
 FORBIDDEN_NAMES = {
@@ -73,18 +78,26 @@ for raw in sys.stdin:
             "math": math,
             "itertools": itertools,
             "fractions": fractions,
+            "statistics": statistics,
+            "decimal": decimal,
         }
         exec(code, ns)
         if "ANSWER" not in ns:
-            if "ans" in ns:
-                ns["ANSWER"] = ns["ans"]
+            for alt_key in ("ans", "answer", "result"):
+                if alt_key in ns:
+                    ns["ANSWER"] = ns[alt_key]
+                    break
             else:
                 raise RuntimeError("sympy_code did not define ANSWER")
         val = ns["ANSWER"]
         # Global Gate 1: Non-empty / non-None
         if val is None or val == [] or val == {} or val == set() or val == sp.EmptySet:
             raise ValueError("Empty or None ANSWER (contradictory/unsolvable conditions)")
-        # Global Gate 2: Reject ambiguous multi-solution lists/sets
+        # Global Gate 2: Reject ambiguous multi-solution collections
+        if isinstance(val, dict):
+            if len(val) != 1:
+                raise ValueError(f"Ambiguous solution dict: {val}")
+            val = next(iter(val.values()))
         if isinstance(val, (list, tuple, set)):
             if len(val) != 1:
                 raise ValueError(f"Ambiguous or empty solution collection: {val}")
@@ -213,17 +226,29 @@ def run_sympy_code(sympy_code: str, timeout_seconds: float = 5.0) -> tuple[bool,
 
 
 def _parse_numeric(value: str) -> float | None:
-    cleaned = value.replace(",", "").replace("$", "").replace("{", "").replace("}", "").strip()
+    cleaned = (
+        value.replace(",", "")
+        .replace("$", "")
+        .replace("{", "")
+        .replace("}", "")
+        .replace(r"\%", "")
+        .replace("%", "")
+        .replace(r"^\circ", "")
+        .replace("°", "")
+        .strip()
+    )
     try:
         return float(cleaned)
     except ValueError:
         pass
 
-    # Support LaTeX math choices like 2\sqrt{31}, \frac{13}{\sqrt{209}}, \arccos\left(\frac{37}{65}\right)
+    # Support full A-Level LaTeX expressions: \dfrac, \tfrac, \sqrt[n]{x}, \log_{b}{x}, trig, e^x, \pi
     expr = value.replace("$", "").replace(",", "").strip()
     expr = expr.replace(r"\left", "").replace(r"\right", "")
-    expr = expr.replace(r"\times", "*").replace(r"\cdot", "*").replace("^", "**")
-    expr = expr.replace(r"\pi", "pi")
+    expr = expr.replace(r"\dfrac", r"\frac").replace(r"\tfrac", r"\frac")
+    expr = expr.replace(r"\times", "*").replace(r"\cdot", "*").replace(r"\div", "/")
+    expr = expr.replace(r"\%", "").replace("%", "").replace(r"^\circ", "").replace("°", "")
+    expr = expr.replace("^", "**").replace(r"\pi", "pi")
     for fn_latex, fn_sympy in (
         (r"\arccos", "acos"),
         (r"\arcsin", "asin"),
@@ -234,16 +259,23 @@ def _parse_numeric(value: str) -> float | None:
         (r"\ln", "log"),
     ):
         expr = expr.replace(fn_latex, fn_sympy)
-    # Iteratively expand nested \frac{a}{b} and \sqrt{a}
+    # Iteratively expand nested \frac{a}{b}, \sqrt[n]{a}, \sqrt{a}, and \log_{b}{a}
     for _ in range(5):
         prev = expr
         expr = re.sub(r"\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}", r"((\1)/(\2))", expr)
+        expr = re.sub(r"\\sqrt\s*\[([^\[\]]+)\]\s*\{([^{}]+)\}", r"((\2)**(1/(\1)))", expr)
         expr = re.sub(r"\\sqrt\s*\{([^{}]+)\}", r"sqrt(\1)", expr)
+        expr = re.sub(r"\\log_\{([^{}]+)\}\s*\{([^{}]+)\}", r"(log(\2)/log(\1))", expr)
+        expr = re.sub(r"\\log_\{([^{}]+)\}\s*\(([^()]+)\)", r"(log(\2)/log(\1))", expr)
+        expr = re.sub(r"\\log_(\d+)\s*\{([^{}]+)\}", r"(log(\2)/log(\1))", expr)
+        expr = re.sub(r"\\log_(\d+)\s*\(([^()]+)\)", r"(log(\2)/log(\1))", expr)
         if expr == prev:
             break
+    expr = re.sub(r"\\log\s*\{([^{}]+)\}", r"(log(\1)/log(10))", expr)
+    expr = re.sub(r"\\log\s*\(([^()]+)\)", r"(log(\1)/log(10))", expr)
     expr = expr.replace("{", "(").replace("}", ")")
     # Insert implicit multiplication: 2sqrt(3) -> 2*sqrt(3), 2pi -> 2*pi, 2(3) -> 2*(3), )( -> )*(
-    expr = re.sub(r"(\d)\s*(?=(?:sqrt|pi|acos|asin|atan|cos|sin|tan|log|\())", r"\1*", expr)
+    expr = re.sub(r"(\d)\s*(?=(?:sqrt|pi|acos|asin|atan|cos|sin|tan|log|e\*\*|\())", r"\1*", expr)
     expr = re.sub(r"\)\s*(?=(?:\d|sqrt|pi|\())", r")*", expr)
     # Strip leading variable assignment like "x = 4" or "t = 1" if purely numeric RHS
     if "=" in expr:
@@ -252,22 +284,64 @@ def _parse_numeric(value: str) -> float | None:
         try:
             import sympy as sp
 
-            val = complex(sp.N(sp.sympify(expr)))
-            if abs(val.imag) < 1e-9:
+            val = complex(sp.N(sp.sympify(expr, locals={"e": sp.E})))
+            if abs(val.imag) < 1e-9 and math.isfinite(val.real):
                 return float(val.real)
         except Exception:
             return None
     return None
 
 
+def _numbers_match(comp_num: float, exp_num: float, exp_raw: str) -> bool:
+    """Match SymPy ground truth against expected numeric/choice string with A-Level rounding support.
+
+    Accepts exact matches (rel_tol=1e-4) AND exact decimal rounding to `d >= 2` decimal places
+    (e.g. SymPy=23.4375 vs A-Level 2-decimal sheet expected='23.44'), plus percentage scaling.
+    """
+    if math.isclose(comp_num, exp_num, rel_tol=1e-4, abs_tol=1e-4):
+        return True
+
+    stripped = exp_raw.replace(",", "").replace("$", "").strip()
+    # Percentage equivalence (e.g., SymPy=0.25 vs expected='25%' or vice versa)
+    if stripped.endswith("%") or stripped.endswith(r"\%"):
+        if math.isclose(comp_num * 100.0, exp_num, rel_tol=1e-3, abs_tol=1e-2):
+            return True
+        if math.isclose(comp_num, exp_num / 100.0, rel_tol=1e-3, abs_tol=1e-4):
+            return True
+
+    # Decimal rounding equivalence: e.g. '23.44' (d=2) matches 23.4375 since |23.4375 - 23.44| <= 0.005
+    m_dec = re.fullmatch(r"[\-\+]?\d+\.(\d+)", stripped)
+    if m_dec:
+        dec_places = len(m_dec.group(1))
+        if dec_places >= 2:
+            half_ulp = 0.5 * (10.0 ** (-dec_places))
+            if abs(comp_num - exp_num) <= half_ulp + 1e-9:
+                return True
+    return False
+
+
 RED_FLAG_PHRASES = (
     "ขออภัย",
     "ปรับโจทย์",
+    "แก้โจทย์",
+    "แก้ไขโจทย์",
+    "เปลี่ยนโจทย์",
     "สมมติโจทย์",
     "ปรับตัวเลข",
+    "ปรับเวกเตอร์",
+    "ปรับสมการ",
+    "ปรับค่า",
+    "เพื่อให้ได้ค่า",
+    "เพื่อให้ได้คำตอบ",
+    "เพื่อให้ลงตัว",
     "แก้โดยใช้ Python",
     "โจทย์ผิด",
     "ไม่มีคำตอบในตัวเลือก",
+    "ไม่มีจำนวนเต็มที่ตรง",
+    "ขัดแย้งกัน",
+    "ไม่สอดคล้อง",
+    "หาคำตอบไม่ได้",
+    "adjust the problem",
 )
 
 
@@ -314,13 +388,14 @@ def check_latex_and_choice_quality(
         if no_escaped.count("$") % 2 != 0:
             return f"Unbalanced '$' LaTeX delimiter in: {txt[:80]!r}"
         for bad_pat in (
-            r"(?<!\\)\bimes\b",
-            r"(?<!\\)\brac\{",
+            r"(?<![a-zA-Z\\])imes(?![a-zA-Z])",
+            r"(?<![a-zA-Z\\])rac\{",
             r"(?<!\\)\bightarrow\b",
             r"(?<!\\)\bext\{",
             r"(?<!\\)\bheta\b",
             r"\\(arctan|arcsin|arccos|sin|cos|tan|ln|log)\(\s*\)",
             r"\\[\u0E00-\u0E7F]",
+            r"\\n(?![a-zA-Z])",
             r"\bVIn\b",
             r"\bifa\b",
             r"\bifla\b",
@@ -331,6 +406,8 @@ def check_latex_and_choice_quality(
 
     if question_format == QuestionFormat.MCQ_5:
         stripped = [c.replace("$", "").strip() for c in choices_latex]
+        if len(stripped) != 5 or any(not c for c in stripped):
+            return "MCQ_5 must have exactly 5 non-empty choices"
         if any(re.search(r"\\infty|[\(\[][\-\d\s]+,\s*[\-\d\\\w]+[\)\]]", c) for c in choices_latex):
             return "Choices contain interval notation like (a, b) or \\infty; reframe the question to ask for a single scalar (e.g., a+b or sum/count of integer solutions)"
         if any(re.search(r"\\?\{[^\}]+,[^\}]+\\?\}", c) for c in choices_latex):
@@ -451,7 +528,7 @@ def verify_generated_question(
                 max_stem_similarity=round(max_sim, 4),
                 error="Numeric answer or SymPy output is not a valid number",
             )
-        matched = math.isclose(comp_num, exp_num, rel_tol=1e-4, abs_tol=1e-4)
+        matched = _numbers_match(comp_num, exp_num, expected_answer)
         return VerificationResult(
             passed=matched,
             computed_answer=computed,
@@ -513,7 +590,7 @@ def verify_generated_question(
 
     chosen_idx = int(expected_answer) - 1
     chosen_num = parsed_choices[chosen_idx]
-    matched = math.isclose(comp_num, chosen_num, rel_tol=1e-4, abs_tol=1e-4)  # type: ignore[arg-type]
+    matched = _numbers_match(comp_num, chosen_num, choices_latex[chosen_idx])  # type: ignore[arg-type]
 
     return VerificationResult(
         passed=matched,

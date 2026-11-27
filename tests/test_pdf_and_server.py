@@ -199,6 +199,30 @@ def test_deterministic_mcq_choices_and_stem_integrity_all_16_chapters():
     assert not ok_bad and err_bad is not None
 
 
+def test_verifier_rounding_latex_and_sympy_edge_cases():
+    import math
+    from src.verifier import _numbers_match, _parse_numeric, run_sympy_code
+
+    # 1. Exact A-Level 2-decimal rounding equivalence (23.4375 -> 23.44 passes, 23.45 fails)
+    assert _numbers_match(23.4375, 23.44, "23.44") is True
+    assert _numbers_match(23.4375, 23.45, "23.45") is False
+    assert _numbers_match(0.25, 25.0, "25%") is True
+
+    # 2. Advanced LaTeX expressions (\dfrac, nth root, log base, e^x, degrees)
+    assert math.isclose(_parse_numeric(r"$\dfrac{3}{2}$"), 1.5, rel_tol=1e-6)
+    assert math.isclose(_parse_numeric(r"$\sqrt[3]{27}$"), 3.0, rel_tol=1e-6)
+    assert math.isclose(_parse_numeric(r"$\log_{2}{8}$"), 3.0, rel_tol=1e-6)
+    assert math.isclose(_parse_numeric(r"$e^2$"), math.e**2, rel_tol=1e-6)
+    assert math.isclose(_parse_numeric(r"$45^\circ$"), 45.0, rel_tol=1e-6)
+
+    # 3. SymPy worker convenience aliases (sp.comb, sp.perm, single-key dict, statistics)
+    ok_comb, val_comb = run_sympy_code("ANSWER = sp.comb(5, 2) + sp.perm(4, 2)")
+    assert ok_comb and math.isclose(float(val_comb), 22.0, rel_tol=1e-6)
+
+    ok_dict, val_dict = run_sympy_code("x = sp.Symbol('x')\nANSWER = sp.solve([sp.Eq(2*x - 6, 0)], [x])")
+    assert ok_dict and math.isclose(float(val_dict), 3.0, rel_tol=1e-6)
+
+
 def test_llm_router_circuit_breaker_and_provider_guards():
     from src.llm_router import _is_daily_quota_exhausted, _parse_retry_after_seconds
 
