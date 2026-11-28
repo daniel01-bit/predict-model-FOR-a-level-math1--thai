@@ -244,7 +244,7 @@
     line-height: 1.4;
   }
 
-  .quota-activity-row.active { color: #bef264; }
+  .quota-activity-row.active { color: var(--accent-bright, #bef264); }
 
   .quota-activity-detail {
     font-size: 11.5px;
@@ -274,8 +274,8 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    border: 2px solid rgba(190, 242, 100, 0.25);
-    border-top-color: #bef264;
+    border: 2px solid rgba(var(--accent-rgb, 132, 169, 77), 0.28);
+    border-top-color: var(--accent-bright, #bef264);
     animation: qSpin 0.8s linear infinite;
     display: none;
     flex-shrink: 0;
@@ -1407,6 +1407,10 @@
 
     <!-- Result State: Top = Exam PDF, Bottom = Solutions PDF -->
     <section id="resultPanel" class="result-panel">
+      <div id="resultLevelHeader" class="diff-top-meta" style="margin-bottom:4px;">
+        <span id="resultModeChip" class="diff-mode-chip">MOCK-TEST</span>
+        <span id="resultLevelBadge" class="diff-level-badge">LEVEL 1 • A-LEVEL</span>
+      </div>
       <div class="pdf-pill-row">
         <a id="examDownloadMain" class="pdf-main-link" href="#" download>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-bright)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -1446,7 +1450,10 @@
     <section id="singleQuestionCard" class="single-q-card">
       <div class="sq-meta">
         <span id="sqChapterTag" style="font-weight:500;">บทเรียน</span>
-        <span id="sqStars" class="stars-ui">★★★☆☆</span>
+        <span style="display:inline-flex; align-items:center; gap:8px;">
+          <span id="sqLevelBadge" class="diff-level-badge" style="font-size:10.5px; padding:2px 8px;">LV.1</span>
+          <span id="sqStars" class="stars-ui">★★★☆☆</span>
+        </span>
       </div>
       <div id="sqStem" class="sq-stem"></div>
       <div id="sqChoices" class="sq-choices"></div>
@@ -2099,14 +2106,59 @@
     }
   }
 
+  function normalizeDisplayLatex(text) {
+    if (!text) return "";
+    const parts = String(text).split(/(\$\$[\s\S]*?\$\$|\$[^$]+\$)/g);
+    for (let i = 0; i < parts.length; i += 2) {
+      let seg = parts[i];
+      if (seg.includes("Sigma_")) {
+        seg = seg.replace(/Sigma_\{([^{}]+)\}\^\{infinity\}/g, "\\sum_{$1}^{\\infty}");
+      }
+      if (seg.includes("\\text{")) {
+        for (let k = 0; k < 3; k++) {
+          const nxt = seg.replace(/\\text\{([^{}]*)\}/g, "$1");
+          if (nxt === seg) break;
+          seg = nxt;
+        }
+      }
+      if (/[\\^_]|!=/.test(seg)) {
+        const chunks = seg.split(/([\u0E00-\u0E7F]+)/g);
+        for (let j = 0; j < chunks.length; j += 2) {
+          const part = chunks[j];
+          if (!/(\\(?:frac|sqrt|sum|det|sin|cos|tan|arctan|infty|pi|theta|times|cdot|overline|vec|leq|geq|neq)|[A-Za-z0-9)]\s*[\^_]\s*[\{\-+A-Za-z0-9]|!=)/.test(part)) {
+            continue;
+          }
+          const core = part.trim();
+          const openB = (core.match(/\{/g) || []).length;
+          const closeB = (core.match(/\}/g) || []).length;
+          if (!core || openB !== closeB) continue;
+          const lead = part.slice(0, part.length - part.trimStart().length);
+          const trail = part.slice(part.trimEnd().length);
+          chunks[j] = `${lead}$${core.replace(/!=/g, "\\neq ")}$${trail}`;
+        }
+        seg = chunks.join("");
+      }
+      parts[i] = seg;
+    }
+    return parts.join("");
+  }
+
   function renderResult(data) {
     setGreetingDonutMode(false);
     document.getElementById("progressCard").classList.remove("active");
 
+    const lv = Number(data.difficulty_level || selectedDifficultyLevel || 1);
+    const lvLabels = { 1: "LEVEL 1 • A-LEVEL", 2: "LEVEL 2 • +50%", 3: "LEVEL 3 • +125%" };
+
     if (data.mode === "question" && data.single_question) {
-      renderSingleQuestion(data.single_question);
+      renderSingleQuestion(data.single_question, lv);
       return;
     }
+
+    const rMode = document.getElementById("resultModeChip");
+    const rBadge = document.getElementById("resultLevelBadge");
+    if (rMode) rMode.textContent = `${String(data.mode || "exam").toUpperCase().replace("_", "-")} • ${data.total || 0} ข้อ`;
+    if (rBadge) rBadge.textContent = lvLabels[lv] || lvLabels[1];
 
     document.getElementById("resultPanel").classList.add("active");
 
@@ -2126,14 +2178,16 @@
     `).join("");
   }
 
-  function renderSingleQuestion(q) {
+  function renderSingleQuestion(q, lv = 1) {
     activeSingleQuestion = q;
     selectedChoiceIdx = null;
 
     const card = document.getElementById("singleQuestionCard");
     document.getElementById("sqChapterTag").textContent = `${q.chapter_th || q.chapter_id} • ${q.question_format === "mcq_5" ? "ปรนัย 5 ตัวเลือก" : "เติมคำตอบตัวเลข"}`;
+    const sqBadge = document.getElementById("sqLevelBadge");
+    if (sqBadge) sqBadge.textContent = lv === 3 ? "LV.3 • +125%" : lv === 2 ? "LV.2 • +50%" : "LV.1 • A-Level";
     document.getElementById("sqStars").textContent = renderStars(q.difficulty_stars);
-    document.getElementById("sqStem").textContent = q.stem_latex;
+    document.getElementById("sqStem").textContent = normalizeDisplayLatex(q.stem_latex);
 
     const choicesEl = document.getElementById("sqChoices");
     const numWrap = document.getElementById("sqNumericWrap");
@@ -2179,8 +2233,8 @@
     vEl.className = `sq-verdict ${verdictClass}`;
     vEl.textContent = verdictText;
 
-    document.getElementById("sqSolution").textContent = `วิธีทำ: ${q.solution_steps_th || "-"}`;
-    document.getElementById("sqTrap").textContent = `จุดหลอกที่ต้องระวัง: ${q.key_trap || "-"} (SymPy verified: ${q.sympy_computed_answer})`;
+    document.getElementById("sqSolution").textContent = `วิธีทำ: ${normalizeDisplayLatex(q.solution_steps_th || "-")}`;
+    document.getElementById("sqTrap").textContent = `จุดหลอกที่ต้องระวัง: ${normalizeDisplayLatex(q.key_trap || "-")} (SymPy verified: ${q.sympy_computed_answer})`;
     fb.classList.add("active");
     renderMath(fb);
   }
@@ -2269,6 +2323,28 @@
     refreshQuota(true);
   });
   document.getElementById("openKeysBtn").addEventListener("click", openKeysModal);
+
+  // Keyboard shortcuts: 1-5 select MCQ choice, Enter checks answer, Esc closes modals
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeKeysModal();
+      closePreviewModal();
+      return;
+    }
+    const card = document.getElementById("singleQuestionCard");
+    if (!card || !card.classList.contains("active") || !activeSingleQuestion) return;
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+    if (e.key === "Enter" && (tag === "input" || activeSingleQuestion.question_format === "mcq_5")) {
+      if (tag !== "button") {
+        e.preventDefault();
+        checkSingleAnswer();
+      }
+      return;
+    }
+    if (tag !== "input" && tag !== "textarea" && activeSingleQuestion.question_format === "mcq_5" && ["1", "2", "3", "4", "5"].includes(e.key)) {
+      selectChoice(Number(e.key));
+    }
+  });
 
   try {
     if (localStorage.getItem("quota_hud_collapsed") === "1") toggleQuotaHud(true);

@@ -43,6 +43,48 @@ from src.verifier import (
 
 
 GenerationMode = Literal["question", "mini_test", "mock_test"]
+DifficultyLevelTier = Literal[1, 2, 3]
+
+DIFFICULTY_LEVEL_PROFILES: dict[int, dict] = {
+    1: {
+        "label": "Level 1 • A-Level",
+        "target_stars": "3–4 ดาว",
+        "min_stars": 3,
+        "thinking_budget": 128,
+        "directive": (
+            "ระดับความยาก Level 1 (มาตรฐาน A-Level สสวท. จริง — 3–4 ดาว): "
+            "เชื่อมโยง 2 แนวคิด คิด 2 ขั้นตอน งดโจทย์ 1 ดาวที่แทนสูตรบรรทัดเดียว"
+        ),
+    },
+    2: {
+        "label": "Level 2 • Hard (+50%)",
+        "target_stars": "4 ดาว",
+        "min_stars": 4,
+        "thinking_budget": 256,
+        "directive": (
+            "ระดับความยาก Level 2 (ยากขึ้นกว่า A-Level ปกติ +50% — เป้าหมาย 4 ดาว): "
+            "ต้องเพิ่มความซับซ้อนของการคำนวณและการประยุกต์อย่างชัดเจน ใช้การคิดต่อเนื่องอย่างน้อย 3 ขั้นตอน "
+            "(เช่น แก้เงื่อนไขแรกหาพารามิเตอร์ → แทนในฟังก์ชัน/สมการขั้นที่สอง → เชื่อมโยงเงื่อนไขประยุกต์หรือเช็กโดเมนซ้อน) "
+            "ใช้เวลาคิดและคำนวณนานขึ้นกว่าข้อสอบ A-Level ปกติ แต่ยังต้องอยู่ในหลักสูตร สสวท. 2560 และคิดเลขลงตัว 100%"
+        ),
+    },
+    3: {
+        "label": "Level 3 • Extreme (+125%)",
+        "target_stars": "4–5 ดาว",
+        "min_stars": 4,
+        "thinking_budget": 384,
+        "directive": (
+            "ระดับความยาก Level 3 (ยากขึ้นจาก Level 2 อีก +50% / ระดับ PAT1-Elite — เป้าหมาย 4–5 ดาว): "
+            "บูรณาการข้ามบทหรือซ้อนเงื่อนไขลึกอย่างน้อย 3–4 ขั้นตอนต่อเนื่อง ต้องจัดรูปพีชคณิต/แคลคูลัส/เรขาคณิตหลายชั้น "
+            "แฝงกับดักโดเมน-ขอบเขต-เครื่องหมายที่ต้องวิเคราะห์อย่างละเอียด ใช้เวลาคำนวณนานที่สุดใน 3 ระดับ "
+            "(แต่ยังคงอยู่ในหลักสูตร สสวท. 2560, คำตอบเดียวแน่นอน, และผ่าน SymPy Verification 100%)"
+        ),
+    },
+}
+
+
+def get_difficulty_profile(level: int) -> dict:
+    return DIFFICULTY_LEVEL_PROFILES.get(int(level), DIFFICULTY_LEVEL_PROFILES[1])
 _STYLE_GUIDE_PATH = Path(__file__).resolve().parent.parent / "config" / "exam_style_guide.json"
 _STYLE_GUIDE_CACHE: dict | None = None
 
@@ -74,17 +116,30 @@ def _style_guide_prompt_block(question_format: QuestionFormat) -> str:
     )
 
 
-def _pick_seed_for_slot(chapter_id: str, question_format: QuestionFormat):
-    """Pick a SymPy-First seed respecting A-Level 61 numeric bubble-sheet bounds [0, 9999.99]."""
+def _pick_seed_for_slot(
+    chapter_id: str,
+    question_format: QuestionFormat,
+    difficulty_level: int = 1,
+    exclude_archetypes: set[str] | None = None,
+):
+    """Pick a SymPy-First seed respecting difficulty_level, non-repeating archetypes, and Part 2 bounds."""
     import sympy as sp
 
-    for _ in range(8):
-        s = generate_verified_seed(chapter_id)
+    for _ in range(10):
+        s = generate_verified_seed(
+            chapter_id,
+            difficulty_level=difficulty_level,
+            exclude_archetypes=exclude_archetypes,
+        )
         if s is None or question_format == QuestionFormat.MCQ_5:
+            if s is not None and s.archetype_id and exclude_archetypes is not None:
+                exclude_archetypes.add(s.archetype_id)
             return s
         try:
             val = float(sp.N(sp.sympify(s.exact_answer)))
-            if 0.0 <= val <= 9999.99:
+            if 0.0 <= val <= 9999.99 and abs(val * 100.0 - round(val * 100.0)) <= 1e-4:
+                if s.archetype_id and exclude_archetypes is not None:
+                    exclude_archetypes.add(s.archetype_id)
                 return s
         except Exception:
             continue
@@ -169,6 +224,10 @@ def audit_math_logic_batch(
 
 
 class GeneratedQuestionDraft(BaseModel):
+    math_scratchpad: str = Field(
+        default="",
+        description="Private brief math setup/verification scratchpad BEFORE writing stem_latex (never shown to students).",
+    )
     stem_latex: str = Field(..., min_length=15)
     choices_latex: list[str] = Field(default_factory=list)
     answer: str = Field(..., min_length=1)
@@ -294,12 +353,19 @@ def generate_verified_slot(
     _allow_fallback: bool = True,
     cancel_event: threading.Event | None = None,
     used_archetypes: set[str] | None = None,
+    difficulty_level: int = 1,
 ) -> dict:
     """Generate a single original IPST-style A-Level 70 question and verify it with SymPy."""
     check_cancelled(cancel_event)
+    diff_prof = get_difficulty_profile(difficulty_level)
     effective_retries = min(max_retries, 2) if provider == "ollama" else max_retries
     ctx = _lookup_curriculum_context(slot.chapter_id, slot.sub_skill_id)
-    seed_obj = _pick_seed_for_slot(slot.chapter_id, slot.question_format)
+    seed_obj = _pick_seed_for_slot(
+        slot.chapter_id,
+        slot.question_format,
+        difficulty_level=difficulty_level,
+        exclude_archetypes=used_archetypes,
+    )
     _, diversity_hint = sample_diversity_directive(slot.chapter_id, used_archetypes=used_archetypes)
     few_shot_block = format_few_shot_block(slot.chapter_id, k=1)
     locked_choices: list[str] | None = None
@@ -342,7 +408,8 @@ def generate_verified_slot(
     )
 
     prompt = f"""คุณคือผู้ออกข้อสอบ A-Level คณิตศาสตร์ประยุกต์ 1 รหัสวิชา 61 (สสวท. หลักสูตร 2560) สำหรับปี 2570
-จงสร้างโจทย์ใหม่ 100% ข้อที่ {slot.slot_number} ระดับความยากมาตรฐาน A-Level จริง (**เน้น 3–4 ดาว** เชื่อมโยงอย่างน้อย 2 แนวคิด งดโจทย์ 1 ดาวที่แทนสูตรบรรทัดเดียว) ตามสเปกต่อไปนี้:
+จงสร้างโจทย์ใหม่ 100% ข้อที่ {slot.slot_number} ตามโหมดความยาก: {diff_prof['directive']}
+สเปกรายละเอียด:
 - บทหลัก: {ctx['chapter_th']} ({slot.chapter_id})
 - ทักษะย่อยเป้าหมาย: {slot.sub_skill_id}
 - หัวข้อในหลักสูตร สสวท.: {', '.join(ctx['topics_th'])}
@@ -381,12 +448,16 @@ def generate_verified_slot(
         )
         if last_error:
             if last_computed and attempt <= 2:
+                locked_hint = ""
+                if slot.question_format == QuestionFormat.MCQ_5:
+                    det_ch, det_ans = build_deterministic_mcq_choices(last_computed, slot.chapter_id)
+                    locked_hint = f"\nแนะนำให้ใช้ตัวเลือกที่ตรงกับค่าจริงนี้เลย: choices_latex={det_ch}, answer='{det_ans}'"
                 retry_hint = (
                     f"\n\nรอบก่อนไม่ผ่านการตรวจ SymPy เพราะ: {last_error}\n"
                     f"โจทย์และโค้ดเดิมของคุณคำนวณด้วย SymPy ได้ค่าจริงคือ `{last_computed}`:\n"
                     f"{last_draft_summary}\n"
                     f"จงแก้ `choices_latex`, `answer`, และ `solution_steps_th` ให้ตรงกับค่าจริง `{last_computed}` "
-                    f"(หรือปรับตัวเลขในโจทย์ให้คิดลงตัวง่ายๆ แล้วให้ `ANSWER` ใน `sympy_code` ตรงกับตัวเลือกที่ถูกเป๊ะ 100%)"
+                    f"(หรือปรับตัวเลขในโจทย์ให้คิดลงตัวง่ายๆ แล้วให้ `ANSWER` ใน `sympy_code` ตรงกับตัวเลือกที่ถูกเป๊ะ 100%){locked_hint}"
                 )
             else:
                 retry_hint = (
@@ -404,7 +475,7 @@ def generate_verified_slot(
                     prompt=prompt + retry_hint,
                     schema_cls=GeneratedQuestionDraft,
                     temperature=0.45 if attempt == 0 else 0.15,
-                    thinking_budget=128 if attempt == 0 else 512,
+                    thinking_budget=diff_prof["thinking_budget"] if attempt == 0 else 512,
                     cancel_event=cancel_event,
                 )
             )
@@ -601,9 +672,11 @@ def generate_verified_batch(
     model_name: str = "gemini-3.5-flash-lite",
     cancel_event: threading.Event | None = None,
     used_archetypes: set[str] | None = None,
+    difficulty_level: int = 1,
 ) -> list[dict]:
     """Generate a batch of up to 5 questions in ONE API call, verify each with SymPy, and repair only failed slots."""
     check_cancelled(cancel_event)
+    diff_prof = get_difficulty_profile(difficulty_level)
     spec_blocks = []
     ctxs = {}
     seeded_slots: set[int] = set()
@@ -617,7 +690,12 @@ def generate_verified_batch(
             if slot.question_format == QuestionFormat.MCQ_5
             else "numeric Part 2 (choices_latex=[], คำตอบต้องเป็นจำนวนไม่ติดลบ 0<=ans<=9999.99 ทศนิยม<=2ตำแหน่ง ห้ามติดลบ ห้ามเศษส่วน /)"
         )
-        seed_obj = generate_verified_seed(slot.chapter_id)
+        seed_obj = _pick_seed_for_slot(
+            slot.chapter_id,
+            slot.question_format,
+            difficulty_level=difficulty_level,
+            exclude_archetypes=batch_used,
+        )
         if seed_obj is not None:
             seeded_slots.add(slot.slot_number)
         _, div_hint = sample_diversity_directive(slot.chapter_id, used_archetypes=batch_used)
@@ -629,13 +707,14 @@ def generate_verified_batch(
         )
 
     prompt = rf"""คุณคือผู้ออกข้อสอบ A-Level คณิตศาสตร์ประยุกต์ 1 รหัสวิชา 61 (สสวท. หลักสูตร 2560) สำหรับปี 2570
-จงสร้างโจทย์ใหม่ 100% จำนวน {len(batch_slots)} ข้อ (**เน้นความยากระดับ 3–4 ดาว** เชื่อมโยง 2 แนวคิด งดโจทย์ 1 ดาวแทนสูตรตรงๆ) เรียงตามลำดับสเปกด้านล่างในฟิลด์ `items` (ต้องครบ {len(batch_slots)} ข้อ):
+จงสร้างโจทย์ใหม่ 100% จำนวน {len(batch_slots)} ข้อ ตามโหมดความยาก: {diff_prof['directive']}
+เรียงตามลำดับสเปกด้านล่างในฟิลด์ `items` (ต้องครบ {len(batch_slots)} ข้อ):
 {chr(10).join(spec_blocks)}
 
 กฎเหล็กทุกข้อ:
 1. ห้ามใช้เนื้อหานอกหลักสูตร 2560 (ห้ามใช้โลปิตาล, กำหนดการเชิงเส้น, ทฤษฎีจำนวนแบบเก่า)
 2. คำตอบต้องเป็นค่าตัวเลขเดี่ยวที่แน่นอน ห้ามใช้ช่วง `(a, b)` / `\\infty` หรือข้อความภาษาไทยในตัวเลือก; และสำหรับข้อ `numeric` (Part 2 ระบายตัวเลข) คำตอบต้องอยู่ในช่วง `0 <= ans <= 9999.99` ทศนิยมไม่เกิน 2 ตำแหน่ง ห้ามติดลบและห้ามเป็นเศษส่วน `/` เด็ดขาด
-3. ประเมิน `difficulty_stars` 1–5 ดาวให้ตรงความยากจริง (เป้าหมาย 3–4 ดาว)
+3. ประเมิน `difficulty_stars` 1–5 ดาวให้ตรงความยากจริง (เป้าหมาย {diff_prof['target_stars']})
 4. `sympy_code` ต้องใช้ `sp` (sympy) คำนวณค่าคำตอบทางคณิตศาสตร์จริงแล้วกำหนดลงตัวแปร `ANSWER` (ห้ามใส่หมายเลขตัวเลือก 1–5 ลงใน `ANSWER`) และ **ห้ามแก้ตัวเลขโจทย์หรือเขียน "ขออภัย/ปรับโจทย์" ใน `solution_steps_th` เด็ดขาด!**
 """
 
@@ -656,8 +735,8 @@ def generate_verified_batch(
             prompt=prompt,
             schema_cls=GeneratedBatchDraft,
             temperature=0.4,
-            timeout_seconds=75.0,
-            thinking_budget=128,
+            timeout_seconds=90.0 if difficulty_level == 1 else 115.0,
+            thinking_budget=diff_prof["thinking_budget"],
             cancel_event=cancel_event,
         )
         check_cancelled(cancel_event)
@@ -743,6 +822,7 @@ def generate_verified_batch(
                 provider=provider,
                 model_name=model_name,
                 cancel_event=cancel_event,
+                difficulty_level=difficulty_level,
             )
     elif missing_slots:
         with ThreadPoolExecutor(max_workers=min(4, len(missing_slots))) as repair_pool:
@@ -757,6 +837,8 @@ def generate_verified_batch(
                     5,
                     True,
                     cancel_event,
+                    None,
+                    difficulty_level,
                 ): slot
                 for slot in missing_slots
             }
@@ -783,12 +865,18 @@ def generate_mock_exam(
     use_pool: bool = True,
     pool: VerifiedQuestionPool | None = None,
     cancel_event: threading.Event | None = None,
+    difficulty_level: int = 1,
 ) -> list[dict]:
     check_cancelled(cancel_event)
     target_slots = slots[:limit] if limit else slots
     total = len(target_slots)
     eff_workers = max_workers if max_workers is not None else recommend_workers(provider)
-    eff_batch = batch_size if batch_size is not None else recommend_batch_size(provider)
+    if batch_size is not None:
+        eff_batch = batch_size
+    else:
+        base_batch = recommend_batch_size(provider)
+        # Level 2 & 3 questions have longer multi-step scratchpads/solutions -> use 3 Qs/batch to prevent timeouts
+        eff_batch = min(base_batch, 3) if (difficulty_level >= 2 and base_batch > 1) else base_batch
     active_pool = pool if pool is not None else GLOBAL_POOL
     results: list[dict] = []
     remaining_slots: list[ExamSlot] = []
@@ -828,6 +916,7 @@ def generate_mock_exam(
                 provider=provider,
                 model_name=model_name,
                 cancel_event=cancel_event,
+                difficulty_level=difficulty_level,
             )
             check_cancelled(cancel_event)
             if use_pool:
@@ -840,6 +929,7 @@ def generate_mock_exam(
         chunks = [remaining_slots[i : i + eff_batch] for i in range(0, rem_total, eff_batch)]
         completed = len(results)
         lock = threading.Lock()
+        shared_used_archetypes: set[str] = set()
         workers = min(eff_workers, len(chunks))
         if on_progress:
             on_progress(completed, total, remaining_slots[0])
@@ -853,6 +943,8 @@ def generate_mock_exam(
                     provider,
                     model_name,
                     cancel_event,
+                    shared_used_archetypes,
+                    difficulty_level,
                 ): chunk
                 for chunk in chunks
             }

@@ -9,9 +9,38 @@ import threading
 from pathlib import Path
 from typing import Iterable
 
+from src.schema import QuestionFormat
+from src.verifier import verify_generated_question
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_POOL_PATH = PROJECT_ROOT / "data" / "verified_pool.jsonl"
+
+
+def _is_strictly_valid_pool_item(item: dict) -> bool:
+    """Re-verify every cached/imported question against the latest SymPy + LaTeX + Red-Flag gates."""
+    if not isinstance(item, dict) or not item.get("verified_sympy"):
+        return False
+    sympy_code = str(item.get("sympy_code") or "").strip()
+    stem = str(item.get("stem_latex") or "").strip()
+    answer = str(item.get("answer") or "").strip()
+    fmt_raw = item.get("question_format")
+    if not sympy_code or not stem or not answer or fmt_raw not in ("mcq_5", "numeric"):
+        return False
+    try:
+        res = verify_generated_question(
+            stem_latex=stem,
+            question_format=QuestionFormat(fmt_raw),
+            choices_latex=list(item.get("choices_latex") or []),
+            expected_answer=answer,
+            sympy_code=sympy_code,
+            historical_stems=None,
+            solution_steps_th=str(item.get("solution_steps_th") or ""),
+            chapter_id=item.get("chapter_id"),
+        )
+        return res.passed
+    except Exception:
+        return False
 
 
 def _question_fingerprint(item: dict) -> str:
@@ -30,28 +59,41 @@ class VerifiedQuestionPool:
         self._served_ids: set[str] = set()
         self._loaded = False
 
+    def _rewrite_disk_unlocked(self) -> None:
+        self.pool_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [json.dumps(rec, ensure_ascii=False) for rec in self._items.values()]
+        self.pool_path.write_text(("\n".join(lines) + "\n") if lines else "", encoding="utf-8")
+
     def _ensure_loaded(self) -> None:
         if self._loaded:
             return
         self._loaded = True
         if not self.pool_path.exists():
             return
+        pruned = 0
         for line in self.pool_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
                 continue
             try:
                 obj = json.loads(line)
-                if not obj.get("verified_sympy"):
+                if not _is_strictly_valid_pool_item(obj):
+                    pruned += 1
                     continue
                 qid = obj.get("pool_id") or _question_fingerprint(obj)
                 obj["pool_id"] = qid
                 self._items[qid] = obj
             except Exception:
+                pruned += 1
                 continue
+        if pruned > 0:
+            print(f"[pool] auto-pruned {pruned} legacy/invalid items from {self.pool_path.name} (kept {len(self._items)})", flush=True)
+            self._rewrite_disk_unlocked()
 
     def add(self, item: dict) -> str:
-        """Persist a verified question into the pool (idempotent by stem fingerprint)."""
+        """Persist a strictly verified question into the pool (idempotent by stem fingerprint)."""
+        if not _is_strictly_valid_pool_item(item):
+            return ""
         with self._lock:
             self._ensure_loaded()
             rec = dict(item)
@@ -68,8 +110,7 @@ class VerifiedQuestionPool:
     def add_many(self, items: Iterable[dict]) -> int:
         added = 0
         for item in items:
-            if item.get("verified_sympy"):
-                self.add(item)
+            if self.add(item):
                 added += 1
         return added
 

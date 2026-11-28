@@ -57,18 +57,18 @@ Evaluated chronologically on real **A-Level Math 1 (2568 & 2569)** exams (`224` 
 
 - **Neuro-Symbolic Dual Verification Gate ([`src/verifier.py`](src/verifier.py)):**
   - **Persistent Isolated SymPy Worker:** Pre-imports `sympy` once inside a dedicated subprocess (~50x faster than cold-spawning Python per question) with restricted `SAFE_BUILTINS` and an explicit module whitelist.
-  - **5 Deterministic Math Gates:** Rejects `None`/empty answers, ambiguous multi-root sets, under-determined free symbols, non-finite/imaginary values (`oo`, `zoo`, `nan`), and invalid chapter domains (e.g., negative counting/sets/areas/distances).
-  - **LaTeX & Choice Integrity Gate:** Repairs JSON-eaten escapes (`\t`/`\f`/`\r`), blocks AI hedging phrases, parses nested `\frac`/`\sqrt`/implicit multiplication/trig expressions, bans interval/set/boolean MCQ choices, and guarantees 5 mathematically distinct finite real choices.
-- **SymPy-First Parameter Seeders & Verified Question Pool ([`src/sympy_seeds.py`](src/sympy_seeds.py), [`src/question_pool.py`](src/question_pool.py)):**
-  - Pre-computes mathematically consistent parameters across **all 16 Syllabus 2560 chapters** before the LLM writes the Thai word problem.
-  - Persistent verified pool (`data/verified_pool.jsonl`) serves non-repeating verified questions instantaneously while silently refilling consumed slots in the background.
-- **Multi-Provider LLM Router with Circuit Breaker ([`src/llm_router.py`](src/llm_router.py)):**
-  - Supports **Google Gemini**, **OpenAI** (including `o1/o3/o4` reasoning models), **Anthropic Claude**, **OpenRouter**, and **Local Ollama**.
-  - Thread-safe `genai.Client` connection caching, per-model **Circuit Breaker cooldown** (`60s` on `429`, `15s` on `503`), request pacing, 1-wave Cloud concurrency (`6` workers, `5` Qs/batch), and safe Local Ollama mode (`1` worker, `1` Q/batch).
-- **Official A-Level 61 A4 PDF Renderer & Olive-Dark AI Exam Studio ([`src/pdf_renderer.py`](src/pdf_renderer.py), [`src/server.py`](src/server.py), [`web/index.html`](web/index.html)):**
-  - Three modes: **`QUESTION`** (1 interactive KaTeX web quiz with instant checking), **`MINI-TEST`** (15 diverse chapters → A4 PDF), and **`MOCK-TEST`** (30 predicted A-Level 70 questions → A4 PDF).
-  - Parallel Headless Edge/Chrome rendering for both **Exam Paper PDF** (Subject Code 61 cover page, student info box, Part 1 & Part 2, 1–5 star difficulty) and **Answer Key PDF** (summary table, step-by-step solutions, key traps, SymPy values).
-  - Real-time API quota HUD, filtered dropdown showing only connected API providers, and a rotating circular $\pi$-digit loader during generation.
+  - **Strict Part 2 Grid-In & 5 Global Math Gates:** Rejects `None`/empty answers, ambiguous multi-root sets, under-determined free symbols, non-finite/imaginary values (`oo`, `zoo`, `nan`), invalid chapter domains, and enforces official TCAS Part 2 bubble-sheet bounds (`0 <= ans <= 9999.99`, max 2 decimals, no `-` or `/`).
+  - **LaTeX, Repetition-Loop & Choice Integrity Gate:** Repairs JSON-eaten escapes (`\t`/`\f`/`\r`), unwraps accidental `\text{...}`, blocks AI hedging/self-editing phrases, catches `eq0`/`3imes3`/Lao leaks and repetition loops, and guarantees 5 mathematically distinct finite real choices.
+- **3-Level Difficulty Engine & Multi-Archetype SymPy-First Seeders ([`src/sympy_seeds.py`](src/sympy_seeds.py), [`src/generator.py`](src/generator.py)):**
+  - **Level 1 (`A-Level`), Level 2 (`+50%`), and Level 3 (`+125% PAT1-Elite`):** Deterministically chains 4 distinct cross-chapter SymPy-First bridges (arithmetic series sum, quadratic Vieta roots, composite function evaluation, linear combo) across **all 16 Syllabus 2560 chapters** before the LLM writes the Thai word problem.
+  - **Selective High-Confidence Audit (Option A):** Skips redundant LLM logic audits on first-pass SymPy-First verified items (~50% lower API quota/cost) while retaining full LLM Logic Audits on unseeded or repaired slots.
+- **Anti-Repetition & Modular Few-Shot Diversity Engine ([`src/diversity.py`](src/diversity.py), [`src/dedup.py`](src/dedup.py), `data/few_shot_examples/`):**
+  - Thai-safe **Character 5-Gram Jaccard + SHA-1 Fingerprint** registry blocks exact/near-exact clones across both same-exam slots and previous runs while allowing fresh variations.
+  - Plug-and-play JSON few-shot bank (`data/few_shot_examples/<chapter_id>.json`) lets you expand 3–4 star IPST exemplars without editing Python code.
+- **Multi-Provider LLM Router with Real-Time Quota Tracker ([`src/llm_router.py`](src/llm_router.py)):**
+  - Supports **Google Gemini**, **OpenAI** (including `o1/o3/o4`), **Anthropic Claude**, **OpenRouter**, and **Local Ollama** with adaptive Free-Tier pacing, `Retry-After` parsing, daily-quota fast-fail, and live RPM/RPD tracking.
+- **Official A-Level 61 A4 PDF Renderer & 3-Theme AI Exam Studio ([`src/pdf_renderer.py`](src/pdf_renderer.py), [`src/server.py`](src/server.py), [`web/index.html`](web/index.html)):**
+  - Three modes (`QUESTION`, `MINI-TEST` 15 Qs, `MOCK-TEST` 30 Qs) × three difficulty levels (Olive / Purple / Crimson dynamic themes), keyboard shortcuts (`1`–`5`, `Enter`, `Esc`), real-time Quota & AI Activity HUD, spinning $\pi$-digit loader, and parallel Headless Edge/Chrome A4 PDF export.
 
 ### Human vs. AI Engineering Ownership
 
@@ -97,7 +97,7 @@ python -m src.pipeline backtest
 python -m src.pipeline forecast --target-year 2570
 python -m src.pipeline generate --target-year 2570 --limit 30
 
-# 4. Run Automated Tests (20/20 passing)
+# 4. Run Automated Tests (28/28 passing)
 python -m pytest -v
 ```
 
@@ -128,13 +128,13 @@ For local execution, `src/verifier.py` isolates LLM-generated SymPy code in a de
 - **ด่านตรวจสองชั้น (Dual Verification Gate):**
   - **Persistent Sandboxed SymPy Worker ([`src/verifier.py`](src/verifier.py)):** รันโค้ด SymPy ในโปรเซสแยกที่โหลด SymPy ค้างไว้ครั้งเดียว (เร็วกว่าเปิด Python ใหม่ทุกข้อ ~50 เท่า) พร้อมตรวจ 5 กฎเหล็ก (ห้ามคำตอบว่าง, ห้ามติดตัวแปรอิสระ, ห้ามค่าอนันต์/จำนวนจินตภาพ, ห้ามโดเมนติดลบในบทที่ห้าม, ตัวเลือก 5 ข้อต้องไม่ซ้ำกันทางคณิตศาสตร์)
   - **SymPy-First Seeders + Self-Repair ([`src/sympy_seeds.py`](src/sympy_seeds.py), [`src/generator.py`](src/generator.py)):** สุ่มพารามิเตอร์ลงตัวล่วงหน้าด้วย SymPy ครบทั้ง 16 บท และถ้าข้อไหนไม่ผ่าน SymPy จะส่งค่าจริงกลับไปให้โมเดลซ่อมให้ตรง 100%
-- **เร่งความเร็วด้วย Batch Concurrency + Verified Question Pool ([`src/question_pool.py`](src/question_pool.py)):**
-  - ยิงสร้างแบบ Batch (5 ข้อ/call, 6 workers สำหรับ Cloud API) + คลังโจทย์ที่ผ่าน SymPy แล้ว (`data/verified_pool.jsonl`) ทำให้ดึงข้อสอบที่ไม่ซ้ำเดิมออกมาได้ทันที และแอบเติมคลังเบื้องหลังอัตโนมัติ
-- **Multi-Provider LLM Router ([`src/llm_router.py`](src/llm_router.py)):**
-  - รองรับทั้ง **Google Gemini, OpenAI, Anthropic Claude, OpenRouter, และ Local Ollama** พร้อม Circuit Breaker กันยิงซ้ำเมื่อติดลิมิต `429/503`
-- **AI Exam Studio UI & A-Level 61 A4 PDF ([`web/index.html`](web/index.html), [`src/pdf_renderer.py`](src/pdf_renderer.py)):**
-  - 3 โหมด: **`QUESTION`** (ทำโจทย์ 1 ข้อพร้อมตรวจบนเว็บทันที), **`MINI-TEST`** (15 ข้อคละ 15 บท → PDF), **`MOCK-TEST`** (30 ข้อตาม Blueprint A-Level 61 จริง → PDF ตัวข้อสอบ + PDF เฉลยละเอียด)
-  - หน้าเว็บธีม Dark เขียวมะกอก, ตัวกรองเลือกเฉพาะ AI ที่เชื่อมต่อ API Key แล้ว, แถบเช็กโควตาแบบเรียลไทม์, และวงแหวนตัวเลขค่า $\pi$ หมุนตอนโหลด
+- **ระบบปรับความยาก 3 ระดับ (Level 1 A-Level / Level 2 +50% / Level 3 +125% PAT1-Elite):**
+  - ผสาน **SymPy-First Seeders** ครบทั้ง 16 บท พร้อมสะพานบูรณาการข้ามบท 4 แนว (อนุกรมเลขคณิต, รากสมการเวียตา, ฟังก์ชันประกอบ, เชิงเส้นต่อยอด) และ **Selective Audit (Option A)** ลดการใช้โควตา API ลง ~50% โดยยังคงความแม่นยำ SymPy 100%
+- **ด่านตรวจสองชั้น + กฎเหล็กอัตนัย Part 2 ([`src/verifier.py`](src/verifier.py), [`src/dedup.py`](src/dedup.py), [`src/diversity.py`](src/diversity.py)):**
+  - ล็อกคำตอบอัตนัย Part 2 ให้ฝนกระดาษคำตอบ ทปอ. ได้จริง (`0 ≤ ans ≤ 9999.99`, ทศนิยมไม่เกิน 2 ตำแหน่ง, ห้ามติดลบ/เศษส่วน), ดักจับ LaTeX พัง (`eq0`, `3imes3`, `\text{...}` นอกโหมดคณิต) และอาการ Repetition Loop
+  - **Thai Char-5gram Anti-Duplicate Registry** ป้องกันข้อซ้ำเป๊ะทั้งในชุดเดียวกันและข้ามชุด + คลังตัวอย่าง **Few-Shot JSON (`data/few_shot_examples/`)** ที่เติมโจทย์แนวใหม่ได้เองโดยไม่ต้องแก้โค้ด
+- **AI Exam Studio UI 3 ธีม + แถบโควตา & กิจกรรม AI เรียลไทม์ ([`web/index.html`](web/index.html), [`src/pdf_renderer.py`](src/pdf_renderer.py)):**
+  - 3 โหมด (`QUESTION` / `MINI-TEST` 15 ข้อ / `MOCK-TEST` 30 ข้อ) × 3 เลเวล (ธีมเขียวมะกอก / ม่วง / แดงเข้ม), คีย์ลัดทำโจทย์ (`1`–`5`, `Enter`, `Esc`), แถบหลอดโควตาและ Log กิจกรรม AI สดมุมบนขวา, และส่งออก A4 PDF มาตรฐานรหัสวิชา 61
 
 <a id="บทบาทของคน-vs-ai-human-vs-ai-roles"></a>
 ### บทบาทของคน vs AI (Human vs. AI Roles)
@@ -159,7 +159,7 @@ cp .env.example .env
 python -m src.server
 # หรือบน Windows ดับเบิลคลิกไฟล์ run_dashboard.bat เพื่อเปิดอัตโนมัติที่ http://127.0.0.1:8000
 
-# 3. รันทดสอบอัตโนมัติ (20/20 ผ่านครบ)
+# 3. รันทดสอบอัตโนมัติ (28/28 ผ่านครบ)
 python -m pytest -v
 ```
 
@@ -174,6 +174,7 @@ predict-math1/
 ├── data/
 │   ├── curriculum/
 │   │   └── ipst_2560_curriculum.json # Structured IPST 2560 M.4-M.6 curriculum & classic traps
+│   ├── few_shot_examples/            # Modular 3-4 star IPST few-shot exemplars per chapter
 │   └── reports/                      # Ablation backtest JSON & A-Level 70 forecast report
 ├── src/
 │   ├── schema.py                     # Strict Pydantic v2 contracts & Syllabus 2560 validators
@@ -181,17 +182,19 @@ predict-math1/
 │   ├── fetch_exams.py                # Public exam archive link discovery & downloader
 │   ├── model.py                      # 3-Tier Weighted Forecaster & MyTCAS 30-Slot Allocator
 │   ├── backtest.py                   # Zero-leakage Walk-Forward Ablation Backtester
-│   ├── sympy_seeds.py                # SymPy-First parameter seeders (all 16 chapters)
-│   ├── verifier.py                   # Persistent Sandboxed SymPy Worker + 5 Global & LaTeX Gates
-│   ├── question_pool.py              # Persistent verified question pool + non-repeating checkout
-│   ├── llm_router.py                 # 5-Provider LLM Router with Circuit Breaker & Pacing
-│   ├── generator.py                  # Batch/Solo Exam Generator + SymPy Self-Repair + Logic Auditor
+│   ├── sympy_seeds.py                # Multi-archetype SymPy-First seeders & Level 1-3 escalation
+│   ├── diversity.py                  # Dynamic archetype/context seeding & modular few-shot loader
+│   ├── dedup.py                      # Thai char-5gram & SHA-1 exact anti-duplicate registry
+│   ├── verifier.py                   # Persistent Sandboxed SymPy Worker + Part 2 & LaTeX Gates
+│   ├── question_pool.py              # Strictly re-verified question pool
+│   ├── llm_router.py                 # 5-Provider LLM Router with real-time quota & activity tracker
+│   ├── generator.py                  # 3-Level Batch/Solo Generator + Selective Audit + Self-Repair
 │   ├── pdf_renderer.py               # Parallel A-Level 61 A4 HTML/KaTeX -> PDF renderer
-│   ├── server.py                     # FastAPI backend + real-time quota HUD + background refill
+│   ├── server.py                     # FastAPI backend + live quota/activity API + auto-reload
 │   └── pipeline.py                   # Unified CLI entrypoint (backtest / forecast / generate)
-├── tests/                            # 20 automated unit & regression tests
+├── tests/                            # 28 automated unit, regression & PDF tests
 ├── web/
-│   └── index.html                    # Olive-Dark AI Exam Studio UI + π-digit loading ring
+│   └── index.html                    # 3-Theme AI Exam Studio UI + Live Quota HUD + π loader
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt

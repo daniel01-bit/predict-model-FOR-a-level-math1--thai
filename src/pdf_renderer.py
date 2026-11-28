@@ -68,6 +68,10 @@ _BARE_MATH_HINT_RE = re.compile(rf"(?:{_LATEX_BRACE_CMD}|{_LATEX_WORD_CMD}|[A-Za
 
 
 def _wrap_prose_segment(seg: str) -> str:
+    # 0) Convert raw ASCII 'Sigma_{...}^{infinity}' into proper LaTeX \sum_{...}^{\infty}
+    if "Sigma_" in seg:
+        seg = re.sub(r"Sigma_\{([^{}]+)\}\^\{infinity\}", r"\\sum_{\1}^{\\infty}", seg)
+
     # 1) Unwrap accidental \text{...} written outside $...$ (which otherwise splits braces across Thai text -> red KaTeX!)
     if r"\text{" in seg:
         for _ in range(3):
@@ -505,34 +509,40 @@ def render_solutions_html(items: list[dict], mode: str = "mock_test", target_yea
     return "".join(parts)
 
 
-def html_to_pdf(html_content: str, output_pdf: Path, timeout_seconds: float = 45.0) -> Path:
+def html_to_pdf(html_content: str, output_pdf: Path, timeout_seconds: float = 75.0) -> Path:
     """Render an HTML document with KaTeX + Sarabun into an A4 PDF via headless Edge/Chrome."""
     browser = find_headless_browser()
     output_pdf.parent.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        html_path = Path(tmpdir) / "doc.html"
-        profile_dir = Path(tmpdir) / "browser_profile"
-        html_path.write_text(html_content, encoding="utf-8")
-        cmd = [
-            str(browser),
-            "--headless=new",
-            "--disable-gpu",
-            "--no-sandbox",
-            f"--user-data-dir={profile_dir.resolve()}",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--no-pdf-header-footer",
-            "--virtual-time-budget=2500",
-            f"--print-to-pdf={output_pdf.resolve()}",
-            html_path.resolve().as_uri(),
-        ]
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds, check=False)
-        if proc.returncode != 0 or not output_pdf.exists() or output_pdf.stat().st_size == 0:
-            raise RuntimeError(
-                f"Headless PDF generation failed (rc={proc.returncode}): {proc.stderr[-300:]}"
-            )
-    return output_pdf
+    last_err: Exception | None = None
+    for attempt in range(2):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            html_path = Path(tmpdir) / "doc.html"
+            profile_dir = Path(tmpdir) / "browser_profile"
+            html_path.write_text(html_content, encoding="utf-8")
+            cmd = [
+                str(browser),
+                "--headless=new",
+                "--disable-gpu",
+                "--no-sandbox",
+                f"--user-data-dir={profile_dir.resolve()}",
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--no-pdf-header-footer",
+                "--virtual-time-budget=2500",
+                f"--print-to-pdf={output_pdf.resolve()}",
+                html_path.resolve().as_uri(),
+            ]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds, check=False)
+                if proc.returncode == 0 and output_pdf.exists() and output_pdf.stat().st_size > 0:
+                    return output_pdf
+                last_err = RuntimeError(
+                    f"Headless PDF generation failed (rc={proc.returncode}): {proc.stderr[-300:]}"
+                )
+            except subprocess.TimeoutExpired as exc:
+                last_err = exc
+    raise RuntimeError(f"Headless PDF generation failed after retry: {last_err}")
 
 
 def render_exam_bundle(

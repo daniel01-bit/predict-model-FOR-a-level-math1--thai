@@ -584,7 +584,7 @@ def generate_structured_json(
     prompt: str,
     schema_cls: Type[T],
     temperature: float = 0.35,
-    timeout_seconds: float = 40.0,
+    timeout_seconds: float = 65.0,
     thinking_budget: int = 128,
     cancel_event: threading.Event | None = None,
 ) -> T:
@@ -595,7 +595,7 @@ def generate_structured_json(
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY is not configured.")
         client = _get_gemini_client(api_key, int(timeout_seconds * 1000))
-        transient_tokens = ("503", "504", "500", "429", "DEADLINE", "UNAVAILABLE")
+        transient_tokens = ("503", "504", "500", "429", "DEADLINE", "UNAVAILABLE", "timed out", "timeout", "ReadTimeout")
         last_err = ""
 
         # Strictly call ONLY the single model selected by the user (no cross-model hopping).

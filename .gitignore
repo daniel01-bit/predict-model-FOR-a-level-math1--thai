@@ -17,6 +17,7 @@ data/pool/
 data/verified_pool.jsonl
 data/reports/jobs/
 data/reports/quota_usage.json
+data/reports/generated_history.jsonl
 
 # Local review / scratch exports
 review_bundle.txt

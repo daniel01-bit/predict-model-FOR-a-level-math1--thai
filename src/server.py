@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from src.backtest import load_jsonl_dataset
 from src.generator import (
+    DifficultyLevelTier,
     GenerationMode,
     build_slots_for_mode,
     generate_mock_exam,
@@ -50,6 +51,7 @@ class JobState:
     provider: str
     model: str
     target_year_be: int
+    difficulty_level: DifficultyLevelTier = 1
     status: str = "queued"          # queued | running | rendering_pdf | done | error | cancelled
     completed: int = 0
     total: int = 1
@@ -136,6 +138,7 @@ class GenerateRequest(BaseModel):
     provider: str = "gemini"
     model: str = "gemini-3.5-flash-lite"
     target_year_be: int = 2570
+    difficulty_level: DifficultyLevelTier = 1
 
 
 class ApiKeyRequest(BaseModel):
@@ -242,8 +245,9 @@ def _run_generation_job(job: JobState) -> None:
             provider=job.provider,
             model_name=job.model,
             on_progress=on_progress,
-            use_pool=True,
+            use_pool=False,
             cancel_event=job.cancel_event,
+            difficulty_level=job.difficulty_level,
         )
         if job.cancel_event.is_set():
             raise JobCancelledError("Job cancelled by user")
@@ -377,6 +381,7 @@ def api_generate(req: GenerateRequest) -> dict:
         provider=req.provider,
         model=req.model,
         target_year_be=req.target_year_be,
+        difficulty_level=req.difficulty_level,
         total=total_map[req.mode],
     )
     JOBS[job_id] = job
@@ -409,6 +414,7 @@ def api_job_status(job_id: str) -> dict:
         "mode": job.mode,
         "provider": job.provider,
         "model": job.model,
+        "difficulty_level": job.difficulty_level,
         "status": job.status,
         "completed": job.completed,
         "total": job.total,

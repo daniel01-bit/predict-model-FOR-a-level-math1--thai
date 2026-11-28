@@ -186,17 +186,59 @@ def test_audit_regression_latex_sanitizer_and_quality_gates():
         assert res.passed is False
         assert expected_kw in (res.error or "").lower()
 
-    # AI hedging red-flag phrase and \rightarrow escape bug must be rejected
+    # AI hedging red-flag phrase and 3imes3 / rationalization leaks must be rejected
     red_flag_res = verify_generated_question(
         stem_latex="จงหาค่า $x$ ที่ทำให้ $2x = 10$",
         question_format=QuestionFormat.NUMERIC,
         choices_latex=[],
         expected_answer="5",
         sympy_code="x = sp.Symbol('x')\nANSWER = sp.solve(2*x - 10, x)[0]",
-        solution_steps_th="ขออภัย ปรับตัวเลขให้ลงตัวจะได้ x = 5",
+        solution_steps_th="ปรับเวกเตอร์ใหม่เพื่อให้ได้ค่า 5",
     )
     assert red_flag_res.passed is False
     assert "red-flag" in (red_flag_res.error or "").lower()
+
+    corrupted_times = verify_generated_question(
+        stem_latex="เมทริกซ์ขนาด 3imes3 ที่มีค่า det เท่ากับ 5",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="5",
+        sympy_code="x = sp.Integer(5)\nANSWER = x * 1",
+    )
+    assert corrupted_times.passed is False
+    assert "garbled" in (corrupted_times.error or "").lower()
+
+    # Broken \leq -> eq0, step-scaffolding in stem, and LLM repetition loop must be rejected
+    corrupted_leq = verify_generated_question(
+        stem_latex="จงหาจำนวนเต็มที่สอดคล้อง $x^2 - x - 2eq0$",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="2",
+        sympy_code="x = sp.Integer(2)\nANSWER = x * 1",
+    )
+    assert corrupted_leq.passed is False
+    assert "garbled" in (corrupted_leq.error or "").lower()
+
+    step_leak = verify_generated_question(
+        stem_latex="ขั้นที่ 1 หาค่า $k$ จากสมการ ขั้นที่ 2 นำไปคำนวณ $2k$",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="4",
+        sympy_code="k = sp.Integer(2)\nANSWER = 2 * k",
+    )
+    assert step_leak.passed is False
+    assert "scaffolding" in (step_leak.error or "").lower()
+
+    loop_stem = "อสมการหลักคือ $x^2 - x - 2 \\le 0$ ตรงกับเงื่อนไข " * 5
+    rep_res = verify_generated_question(
+        stem_latex=loop_stem,
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="2",
+        sympy_code="k = sp.Integer(2)\nANSWER = k * 1",
+    )
+    assert rep_res.passed is False
+    assert "repetition loop" in (rep_res.error or "").lower()
 
 
 def test_all_sympy_first_seeds_verify_cleanly():
@@ -207,13 +249,24 @@ def test_all_sympy_first_seeds_verify_cleanly():
     assert set(_SEEDERS.keys()) == syllabus.valid_chapter_ids()
 
     for ch_id in _SEEDERS:
-        seed = generate_verified_seed(ch_id, seed=42)
-        assert seed is not None
-        ok, computed = run_sympy_code(seed.sympy_code)
-        assert ok, f"Seed {ch_id} failed: {computed}"
-        expected_num = _parse_numeric(seed.exact_answer)
-        assert expected_num is not None
-        assert abs(float(computed) - expected_num) < 1e-4
+        for lv in (1, 2, 3):
+            seed = generate_verified_seed(ch_id, seed=42, difficulty_level=lv)
+            assert seed is not None
+            ok, computed = run_sympy_code(seed.sympy_code)
+            assert ok, f"Seed {ch_id} lv={lv} failed: {computed}"
+            expected_num = _parse_numeric(seed.exact_answer)
+            assert expected_num is not None
+            assert abs(float(computed) - expected_num) < 1e-4
+
+    # Verify non-repeating seed archetypes inside the same exam for calculus & trigonometry
+    used_calc: set[str] = set()
+    c_archs = []
+    for i in range(3):
+        s = generate_verified_seed("calculus", seed=10 + i, exclude_archetypes=used_calc)
+        assert s is not None and s.archetype_id
+        used_calc.add(s.archetype_id)
+        c_archs.append(s.archetype_id)
+    assert len(set(c_archs)) == 3
 
     # Verify new audit regression gates: Lao script, empty arctan(), '1.) ' choice prefix
     assert sanitize_choice_text("1.) 2.0") == "2.0"
@@ -292,3 +345,68 @@ def test_global_sympy_assertions_block_underdetermined_infinite_and_invalid_doma
     )
     assert neg_area.passed is False
     assert "cannot be negative" in (neg_area.error or "").lower()
+
+    # 4) Part 2 (NUMERIC grid-in) strict A-Level bubble-sheet bounds: 0 <= ans <= 9999.99, <= 2 decimals, no '/'
+    neg_part2 = verify_generated_question(
+        stem_latex="จงหาค่าของ $x$ จากสมการ $x + 7 = 0$",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="-7",
+        sympy_code="x = sp.Symbol('x')\nANSWER = sp.solve(x + 7, x)[0]",
+    )
+    assert neg_part2.passed is False
+    assert "negative" in (neg_part2.error or "").lower()
+
+    frac_part2 = verify_generated_question(
+        stem_latex="จงหาความน่าจะเป็นของเหตุการณ์นี้",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="3/16",
+        sympy_code="ANSWER = sp.Rational(3, 16) * sp.Integer(1)",
+    )
+    assert frac_part2.passed is False
+    assert "fraction" in (frac_part2.error or "").lower()
+
+    dec3_part2 = verify_generated_question(
+        stem_latex="จงหาค่าของ $1/8$",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="0.125",
+        sympy_code="ANSWER = sp.Rational(1, 8) + sp.Integer(0)",
+    )
+    assert dec3_part2.passed is False
+    assert "2 decimal" in (dec3_part2.error or "").lower()
+
+    over_part2 = verify_generated_question(
+        stem_latex="จงหาค่าของ $10000 + 5$",
+        question_format=QuestionFormat.NUMERIC,
+        choices_latex=[],
+        expected_answer="10005",
+        sympy_code="ANSWER = sp.Integer(10000) + sp.Integer(5)",
+    )
+    assert over_part2.passed is False
+    assert "9999.99" in (over_part2.error or "")
+
+    from src.diversity import load_few_shot_examples, sample_diversity_directive
+
+    for ch in ("sequences_series", "functions", "analytic_geometry", "vectors_3d"):
+        assert len(load_few_shot_examples(ch, k=2)) >= 2
+    used: set[str] = set()
+    a1, _ = sample_diversity_directive("functions", used_archetypes=used)
+    a2, _ = sample_diversity_directive("functions", used_archetypes=used)
+    assert a1 != a2
+
+    # 5) Thai char-5gram & exact-hash Anti-Duplicate Registry: similar allowed, exact/clone blocked
+    import tempfile
+    from pathlib import Path
+    from src.dedup import GeneratedStemRegistry
+
+    with tempfile.TemporaryDirectory() as td:
+        reg = GeneratedStemRegistry(history_path=Path(td) / "hist.jsonl")
+        q1 = "กำหนดวงรีมีสมการ $(x - 2)^2 / 25 + (y + 1)^2 / 16 = 1$ จงหาความยาวรอบรูปของสามเหลี่ยม $PF_1F_2$"
+        q_exact = "กำหนดวงรีมีสมการ $(x-2)^2/25 + (y+1)^2/16 = 1$ จงหาความยาวรอบรูปของสามเหลี่ยม $PF_1F_2$"
+        q_similar = "โรงงานออกแบบหลังคาทรงวงรี $(x + 3)^2 / 169 + (y - 4)^2 / 144 = 1$ จงหาระยะห่างระหว่างจุดโฟกัสและแกนเอก"
+        assert reg.check_duplicate(q1) is None
+        reg.register(q1, "analytic_geometry", "conics")
+        assert reg.check_duplicate(q_exact) is not None  # exact clone blocked!
+        assert reg.check_duplicate(q_similar) is None     # conceptually similar with different context/numbers allowed!

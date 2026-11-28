@@ -21,6 +21,7 @@ class MathSeed:
     exact_answer: str
     sympy_code: str
     suggested_stars: int = 3
+    archetype_id: str = ""
 
 
 def _seed_sets(rng: random.Random) -> MathSeed:
@@ -163,45 +164,108 @@ def _seed_functions(rng: random.Random) -> MathSeed:
     return MathSeed("functions", desc, str(ans), code, suggested_stars=4)
 
 
-def _seed_expo_log(rng: random.Random) -> MathSeed:
-    # log_2(x - a) + log_2(x - b) = c where (x-a)(x-b) = 2^c has one valid root x > max(a, b)
-    # Pick valid root x_true and factor pair (u, v) with u*v = 2^c
-    c = rng.choice([3, 4, 5])
-    p_u = rng.randint(1, c - 1)
-    u = 2**p_u
-    v = 2 ** (c - p_u)
-    x_true = max(u, v) + rng.randint(2, 6)
-    a = x_true - u
-    b = x_true - v
+def _seed_expo_log(rng: random.Random, exclude: set[str] | None = None) -> MathSeed:
+    excl = exclude or set()
+    opts = [a for a in ("expo_log_domain_quad", "expo_sub_roots_sum") if a not in excl] or [
+        "expo_log_domain_quad",
+        "expo_sub_roots_sum",
+    ]
+    pick = rng.choice(opts)
+    if pick == "expo_log_domain_quad":
+        c = rng.choice([3, 4, 5])
+        p_u = rng.randint(1, c - 1)
+        u = 2**p_u
+        v = 2 ** (c - p_u)
+        x_true = max(u, v) + rng.randint(2, 6)
+        a = x_true - u
+        b = x_true - v
+        code = (
+            f"x = sp.Symbol('x', real=True)\n"
+            f"sols = sp.solve(sp.Eq((x - {a})*(x - {b}), 2**{c}), x)\n"
+            f"valid = [s for s in sols if s > max({a}, {b})]\n"
+            f"assert len(valid) == 1\n"
+            f"ANSWER = valid[0]"
+        )
+        desc = (
+            f"จงหาค่าจำนวนจริง x ที่สอดคล้องสมการ log_2(x - {a}) + log_2(x - {b}) = {c} "
+            f"(ต้องตรวจโดเมนหลัง log > 0; คำตอบแน่นอน = {x_true})"
+        )
+        return MathSeed("expo_log", desc, str(x_true), code, suggested_stars=3, archetype_id=pick)
+
+    # Archetype 2: Exponential substitution 4^x - (u+v)*2^x + u*v = 0
+    p1 = rng.randint(1, 3)
+    p2 = p1 + rng.randint(1, 3)
+    u, v = 2**p1, 2**p2
+    ans = p1 + p2
     code = (
-        f"x = sp.Symbol('x', real=True)\n"
-        f"sols = sp.solve(sp.Eq((x - {a})*(x - {b}), 2**{c}), x)\n"
-        f"valid = [s for s in sols if s > max({a}, {b})]\n"
-        f"assert len(valid) == 1\n"
-        f"ANSWER = valid[0]"
+        f"t = sp.Symbol('t', positive=True)\n"
+        f"ts = sp.solve(sp.Eq(t**2 - {u + v}*t + {u * v}, 0), t)\n"
+        f"xs = [sp.log(val, 2) for val in ts]\n"
+        f"assert len(xs) == 2\n"
+        f"ANSWER = sum(xs)"
     )
     desc = (
-        f"จงหาค่าจำนวนจริง x ที่สอดคล้องสมการ log_2(x - {a}) + log_2(x - {b}) = {c} "
-        f"(ต้องตรวจโดเมนหลัง log > 0; คำตอบแน่นอน = {x_true})"
+        f"จงหาผลบวกของคำตอบจำนวนจริง x ทั้งหมดของสมการ 4^x - {u + v}(2^x) + {u * v} = 0 "
+        f"(คำตอบแน่นอน = {ans}, 3-4 ดาว)"
     )
-    return MathSeed("expo_log", desc, str(x_true), code, suggested_stars=3)
+    return MathSeed("expo_log", desc, str(ans), code, suggested_stars=4, archetype_id=pick)
 
 
-def _seed_trigonometry(rng: random.Random) -> MathSeed:
-    # Exact tan(arctan(1/p) + arctan(1/q)) = (p + q) / (p*q - 1) with p*q > 1
-    p, q = rng.choice([(2, 3), (2, 5), (3, 4), (3, 5), (2, 7)])
-    val = sp.Rational(p + q, p * q - 1)
-    ans_str = str(int(val)) if val.q == 1 else f"{val.p}/{val.q}"
+def _seed_trigonometry(rng: random.Random, exclude: set[str] | None = None) -> MathSeed:
+    excl = exclude or set()
+    opts = [a for a in ("trig_arctan_sum", "trig_double_angle", "trig_law_of_cosines") if a not in excl] or [
+        "trig_arctan_sum",
+        "trig_double_angle",
+        "trig_law_of_cosines",
+    ]
+    pick = rng.choice(opts)
+    if pick == "trig_arctan_sum":
+        p, q = rng.choice([(2, 3), (2, 5), (3, 4), (3, 5), (2, 7)])
+        val = sp.Rational(p + q, p * q - 1)
+        ans_str = str(int(val)) if val.q == 1 else f"{val.p}/{val.q}"
+        code = (
+            f"p, q = sp.Integer({p}), sp.Integer({q})\n"
+            f"assert p * q > 1\n"
+            f"ANSWER = sp.trigsimp(sp.tan(sp.atan(sp.Rational(1, p)) + sp.atan(sp.Rational(1, q))))"
+        )
+        desc = (
+            f"กำหนดให้มุม theta = arctan(1/{p}) + arctan(1/{q}) (เขียน \\theta และตัวเลขเศษส่วนให้ครบ ห้ามเว้นว่าง) "
+            f"จงหาค่าของ tan(theta) (คำตอบแน่นอน = {ans_str})"
+        )
+        return MathSeed("trigonometry", desc, ans_str, code, suggested_stars=3, archetype_id=pick)
+
+    if pick == "trig_double_angle":
+        a, b, c = rng.choice([(3, 4, 5), (5, 12, 13), (8, 15, 17), (7, 24, 25)])
+        ans = 2 * a * b
+        code = (
+            f"s = sp.Rational({a}, {c})\n"
+            f"co = sp.sqrt(1 - s**2)\n"
+            f"ANSWER = sp.Integer({c**2}) * (2 * s * co)\n"
+            f"assert ANSWER > 0"
+        )
+        desc = (
+            f"กำหนดมุมแหลม theta อยู่ในจตุภาคที่ 1 โดย sin(theta) = {a}/{c} "
+            f"จงหาค่าของ {c**2} sin(2*theta) (คำตอบแน่นอน = {ans}, 3 ดาว)"
+        )
+        return MathSeed("trigonometry", desc, str(ans), code, suggested_stars=3, archetype_id=pick)
+
+    # Archetype 3: Law of Cosines with 60 or 120 degrees
+    s1 = rng.randint(4, 9)
+    s2 = rng.randint(5, 10)
+    deg = rng.choice([60, 120])
+    cos_val = sp.Rational(1, 2) if deg == 60 else sp.Rational(-1, 2)
+    ans = int(s1**2 + s2**2 - 2 * s1 * s2 * cos_val)
     code = (
-        f"p, q = sp.Integer({p}), sp.Integer({q})\n"
-        f"assert p * q > 1\n"
-        f"ANSWER = sp.trigsimp(sp.tan(sp.atan(sp.Rational(1, p)) + sp.atan(sp.Rational(1, q))))"
+        f"a, b = sp.Integer({s1}), sp.Integer({s2})\n"
+        f"c_sq = a**2 + b**2 - 2*a*b*sp.cos(sp.rad({deg}))\n"
+        f"assert c_sq > 0\n"
+        f"ANSWER = sp.simplify(c_sq)"
     )
     desc = (
-        f"กำหนดให้มุม theta = arctan(1/{p}) + arctan(1/{q}) (เขียน \\theta และตัวเลขเศษส่วนให้ครบ ห้ามเว้นว่าง) "
-        f"จงหาค่าของ tan(theta) (คำตอบแน่นอน = {ans_str})"
+        f"สามเหลี่ยม ABC มีด้าน a = {s1} หน่วย, ด้าน b = {s2} หน่วย และมุม C = {deg} องศา "
+        f"จงหาค่ากำลังสองของความยาวด้าน c (c^2; คำตอบแน่นอน = {ans}, 3 ดาว)"
     )
-    return MathSeed("trigonometry", desc, ans_str, code, suggested_stars=3)
+    return MathSeed("trigonometry", desc, str(ans), code, suggested_stars=3, archetype_id=pick)
 
 
 def _seed_complex_numbers(rng: random.Random) -> MathSeed:
@@ -280,8 +344,8 @@ def _seed_sequences_series(rng: random.Random) -> MathSeed:
         f"assert ANSWER > 0"
     )
     desc = (
-        f"จงหาผลบวกของอนุกรมอนันต์ Sigma_{{n=1}}^{{infinity}} {c_mult} * ({num}/{den})^n "
-        f"(ระวังดัชนีเริ่มต้น n=1 ไม่ใช่ n=0; คำตอบแน่นอน = {ans}, 3 ดาว)"
+        f"จงหาผลบวกของอนุกรมอนันต์ $\\sum_{{n=1}}^{{\\infty}} {c_mult}\\left(\\frac{{{num}}}{{{den}}}\\right)^n$ "
+        f"(ระวังดัชนีเริ่มต้น $n=1$ ไม่ใช่ $n=0$; คำตอบแน่นอน = {ans}, 3 ดาว)"
     )
     return MathSeed("sequences_series", desc, ans, code, suggested_stars=3)
 
@@ -458,22 +522,64 @@ def _seed_probability(rng: random.Random) -> MathSeed:
     return MathSeed("probability", desc, ans_str, code, suggested_stars=2)
 
 
-def _seed_calculus(rng: random.Random) -> MathSeed:
-    c = rng.randint(1, 5)
-    a = rng.randint(1, 4)
-    b_true = c * (2 - a)
+def _seed_calculus(rng: random.Random, exclude: set[str] | None = None) -> MathSeed:
+    excl = exclude or set()
+    opts = [a for a in ("calc_tangent_slope", "calc_definite_area", "calc_limit_cont") if a not in excl] or [
+        "calc_tangent_slope",
+        "calc_definite_area",
+        "calc_limit_cont",
+    ]
+    pick = rng.choice(opts)
+    if pick == "calc_tangent_slope":
+        a = rng.randint(2, 5)
+        b = rng.randint(1, 6)
+        x0 = rng.randint(2, 4)
+        ans = 3 * (x0**2) + 2 * a * x0 + b
+        code = (
+            f"x = sp.Symbol('x', real=True)\n"
+            f"f = x**3 + {a}*x**2 + {b}*x + 5\n"
+            f"ANSWER = sp.diff(f, x).subs(x, {x0})\n"
+            f"assert ANSWER > 0"
+        )
+        desc = (
+            f"กำหนดเส้นโค้ง y = x^3 + {a}x^2 + {b}x + 5 "
+            f"จงหาความชันของเส้นสัมผัสเส้นโค้งที่จุด x = {x0} (คำตอบแน่นอน = {ans}, 3 ดาว)"
+        )
+        return MathSeed("calculus", desc, str(ans), code, suggested_stars=3, archetype_id=pick)
+
+    if pick == "calc_definite_area":
+        a = rng.randint(1, 3)
+        b = rng.randint(1, 4)
+        c = rng.randint(1, 5)
+        u = rng.randint(2, 4)
+        ans = a * (u**3) + b * (u**2) + c * u
+        code = (
+            f"x = sp.Symbol('x', real=True)\n"
+            f"f = {3 * a}*x**2 + {2 * b}*x + {c}\n"
+            f"ANSWER = sp.integrate(f, (x, 0, {u}))\n"
+            f"assert ANSWER > 0"
+        )
+        desc = (
+            f"จงหาพื้นที่ปิดล้อมด้วยเส้นโค้ง y = {3 * a}x^2 + {2 * b}x + {c}, แกน X, "
+            f"เส้นตรง x = 0 และ x = {u} (คำตอบแน่นอน = {ans}, 3-4 ดาว)"
+        )
+        return MathSeed("calculus", desc, str(ans), code, suggested_stars=4, archetype_id=pick)
+
+    # Archetype 3: Limit continuity with guaranteed POSITIVE b_true > 0
+    c = rng.randint(2, 6)
+    b_true = c  # a = 1 -> 1*c + b = 2c -> b = c > 0 always!
     code = (
         f"x, b = sp.symbols('x b')\n"
         f"lim_val = sp.limit((x**2 - {c**2}) / (x - {c}), x, {c})\n"
-        f"sol_b = sp.solve(sp.Eq({a}*{c} + b, lim_val), b)[0]\n"
-        f"assert sp.limit((x**2 - {c**2}) / (x - {c}), x, {c}) == {a}*{c} + sol_b\n"
+        f"sol_b = sp.solve(sp.Eq(x + b, lim_val).subs(x, {c}), b)[0]\n"
+        f"assert sol_b > 0\n"
         f"ANSWER = sol_b"
     )
     desc = (
-        f"กำหนดฟังก์ชัน f(x) = (x^2 - {c**2})/(x - {c}) เมื่อ x != {c} และ f(x) = {a}x + b เมื่อ x = {c} "
-        f"ถ้า f ต่อเนื่องที่ x = {c} จงหาค่าของ b (คำตอบแน่นอน = {b_true})"
+        f"กำหนดฟังก์ชัน f(x) = (x^2 - {c**2})/(x - {c}) เมื่อ x != {c} และ f(x) = x + b เมื่อ x = {c} "
+        f"ถ้า f ต่อเนื่องที่ x = {c} จงหาค่าของ b (คำตอบแน่นอน = {b_true}, 3 ดาว)"
     )
-    return MathSeed("calculus", desc, str(b_true), code, suggested_stars=3)
+    return MathSeed("calculus", desc, str(b_true), code, suggested_stars=3, archetype_id=pick)
 
 
 _SEEDERS = {
@@ -497,10 +603,10 @@ _SEEDERS = {
 
 
 def escalate_seed_for_level(base: MathSeed, difficulty_level: int, rng: random.Random) -> MathSeed:
-    """Deterministically chain Stage-2 / Stage-3 SymPy transformations for Level 2 (+50%) and Level 3 (+125%).
+    """Deterministically chain diverse cross-chapter Stage-2 / Stage-3 SymPy transforms for Level 2 & 3.
 
-    Keeps 100% SymPy-verified ground-truth math BEFORE the LLM writes the Thai word problem,
-    eliminating mental-arithmetic mismatches on harder multi-step levels.
+    Uses 4 distinct natural IPST-style cross-chapter bridges (arithmetic series sum, quadratic Vieta roots,
+    function evaluation, and direct/scaled transform) so exams NEVER look copy-pasted with one wrapper formula.
     """
     if difficulty_level <= 1:
         return base
@@ -513,92 +619,111 @@ def escalate_seed_for_level(base: MathSeed, difficulty_level: int, rng: random.R
     if not (abs(base_val) <= 200 and abs(base_val * 10 - round(base_val * 10)) < 1e-6):
         return base
 
-    if difficulty_level == 2:
-        a_coef = rng.choice([2, 3])
-        b_coef = rng.randint(2, 7)
-        c_shift = rng.randint(5, 19)
-        if abs(base_val) <= 35 and base_expr.is_integer:
-            stage2_expr = sp.simplify(a_coef * (base_expr**2) - b_coef * base_expr + c_shift)
-            if 0 <= float(sp.N(stage2_expr)) <= 9000:
-                ans_str = str(int(stage2_expr))
+    is_int = bool(base_expr.is_integer)
+    k_ref = "k" if base_val >= 0 else "|k|"
+    k_sympy = "_k1" if base_val >= 0 else "sp.Abs(_k1)"
+    k_num = base_expr if base_val >= 0 else sp.Abs(base_expr)
+    stars = 4 if difficulty_level == 2 else 5
+    lvl_tag = "Level 2 (+50%)" if difficulty_level == 2 else "Level 3 (PAT1-Elite)"
+
+    # Choose among 4 distinct natural cross-chapter bridges (no repetitive m = |k| + c pattern!)
+    bridges = ["series_sum", "vieta_roots", "func_eval", "linear_combo"]
+    rng.shuffle(bridges)
+
+    for bridge in bridges:
+        if bridge == "series_sum" and is_int and abs(base_val) <= 60:
+            # Cross-chapter bridge: Arithmetic series S_n with a_1 = k (or |k|) and common diff d
+            n_terms = rng.choice([4, 5, 6] if difficulty_level == 2 else [6, 8, 10])
+            d_step = rng.randint(2, 5 if difficulty_level == 2 else 9)
+            val_expr = sp.simplify(sp.Rational(n_terms, 2) * (2 * k_num + (n_terms - 1) * d_step))
+            val_f = float(sp.N(val_expr))
+            if val_expr.is_integer and 0 <= val_f <= 9000:
+                ans_str = str(int(val_expr))
                 code = (
                     f"{base.sympy_code}\n"
-                    f"_k_stage1 = ANSWER\n"
-                    f"ANSWER = sp.simplify({a_coef}*(_k_stage1**2) - {b_coef}*_k_stage1 + {c_shift})\n"
+                    f"_k1 = ANSWER\n"
+                    f"ANSWER = sp.simplify(sp.Rational({n_terms}, 2) * (2*({k_sympy}) + ({n_terms} - 1)*{d_step}))\n"
                     f"assert ANSWER >= 0"
                 )
                 desc = (
-                    f"[Level 2 — โจทย์เชื่อมโยงหลายชั้นแบบ สสวท. (ห้ามเขียนคำว่า 'ขั้นที่ 1/2' ลงในตัวโจทย์)]\n"
-                    f"  เงื่อนไขฐาน (กำหนดค่าตัวแปรกลาง k): {base.params_description_th}\n"
-                    f"  เป้าหมายปลายทาง (ผูกต่อเป็นประโยคเดียวอย่างเป็นธรรมชาติ): "
-                    f"ให้ถามหาค่าของ {a_coef}k^2 - {b_coef}k + {c_shift} "
-                    f"(คำตอบสุดท้ายแน่นอน = {ans_str}, ความยาก 4 ดาว)"
+                    f"[{lvl_tag} — บูรณาการข้ามบทกับอนุกรมเลขคณิต (ห้ามเขียนคำว่า 'ขั้นที่ 1/2' ในตัวโจทย์)]\n"
+                    f"  เงื่อนไขหลัก (หาค่า k): {base.params_description_th}\n"
+                    f"  เงื่อนไขเชื่อมโยง: กำหนดลำดับเลขคณิตมีพจน์แรกเท่ากับ ${k_ref}$ และผลต่างร่วม $d = {d_step}$ "
+                    f"จงหาผลบวก {n_terms} พจน์แรกของลำดับเลขคณิตนี้ (คำตอบสุดท้ายแน่นอน = {ans_str}, {stars} ดาว)"
                 )
-                return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=4)
+                return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=stars, archetype_id=base.archetype_id)
 
-        m_coef = rng.choice([2, 4])
-        c_add = rng.randint(7, 25)
-        stage2_expr = sp.simplify(m_coef * sp.Abs(base_expr) + c_add)
-        stage2_val = float(sp.N(stage2_expr))
-        if 0 <= stage2_val <= 9999.99 and abs(stage2_val * 100 - round(stage2_val * 100)) < 1e-4:
-            ans_str = str(int(stage2_expr)) if stage2_expr.is_integer else f"{stage2_val:.2f}".rstrip("0").rstrip(".")
-            code = (
-                f"{base.sympy_code}\n"
-                f"_k_stage1 = ANSWER\n"
-                f"ANSWER = sp.simplify({m_coef}*sp.Abs(_k_stage1) + {c_add})\n"
-                f"assert ANSWER >= 0"
-            )
-            desc = (
-                f"[Level 2 — โจทย์เชื่อมโยงหลายชั้นแบบ สสวท. (ห้ามเขียนคำว่า 'ขั้นที่ 1/2' ลงในตัวโจทย์)]\n"
-                f"  เงื่อนไขฐาน (กำหนดค่าตัวแปรกลาง k): {base.params_description_th}\n"
-                f"  เป้าหมายปลายทาง (ผูกต่ออย่างเป็นธรรมชาติ): จงหาค่าของ {m_coef}|k| + {c_add} "
-                f"(คำตอบสุดท้ายแน่นอน = {ans_str}, ความยาก 4 ดาว)"
-            )
-            return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=4)
-        return base
+        if bridge == "vieta_roots" and is_int and abs(base_val) <= 30:
+            # Cross-chapter bridge: Vieta's formula r1^2 + r2^2 = (k + p)^2 - 2q
+            p_add = rng.randint(2, 6 if difficulty_level == 2 else 11)
+            q_prod = rng.randint(3, 9)
+            val_expr = sp.simplify((k_num + p_add) ** 2 - 2 * q_prod)
+            val_f = float(sp.N(val_expr))
+            # Ensure real distinct roots: discriminant (k+p)^2 - 4q > 0
+            disc = float(sp.N((k_num + p_add) ** 2 - 4 * q_prod))
+            if disc > 0 and 0 <= val_f <= 9000:
+                ans_str = str(int(val_expr))
+                code = (
+                    f"{base.sympy_code}\n"
+                    f"_k1 = ANSWER\n"
+                    f"_s = ({k_sympy}) + {p_add}\n"
+                    f"assert _s**2 - 4*{q_prod} > 0\n"
+                    f"ANSWER = sp.simplify(_s**2 - 2*{q_prod})\n"
+                    f"assert ANSWER >= 0"
+                )
+                desc = (
+                    f"[{lvl_tag} — บูรณาการข้ามบทกับพหุนามและรากสมการกำลังสอง (ห้ามเขียนคำว่า 'ขั้นที่ 1/2' ในตัวโจทย์)]\n"
+                    f"  เงื่อนไขหลัก (หาค่า k): {base.params_description_th}\n"
+                    f"  เงื่อนไขเชื่อมโยง: ถ้า $r_1, r_2$ เป็นคำตอบของสมการ $t^2 - ({k_ref} + {p_add})t + {q_prod} = 0$ "
+                    f"จงหาค่าของ $r_1^2 + r_2^2$ (คำตอบสุดท้ายแน่นอน = {ans_str}, {stars} ดาว)"
+                )
+                return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=stars, archetype_id=base.archetype_id)
 
-    # Level 3 (+125% harder / PAT1-Elite): 3-stage chained equation
-    p_off = rng.randint(3, 9)
-    q_add = rng.randint(11, 29)
-    if base_expr.is_integer and abs(base_val) <= 30:
-        abs_k = sp.Abs(base_expr)
-        stage3_expr = sp.simplify((abs_k + p_off) ** 2 + 2 * abs_k + q_add)
-        if 0 <= float(sp.N(stage3_expr)) <= 9000:
-            ans_str = str(int(stage3_expr))
-            code = (
-                f"{base.sympy_code}\n"
-                f"_k1 = sp.Abs(ANSWER)\n"
-                f"_m = _k1 + {p_off}\n"
-                f"ANSWER = sp.simplify(_m**2 + 2*_k1 + {q_add})\n"
-                f"assert ANSWER >= 0"
-            )
-            desc = (
-                f"[Level 3 — PAT1-Elite เชื่อมโยงเงื่อนไขซ้อนอย่างเนียนเป็นธรรมชาติ (ห้ามเขียนคำว่า 'ขั้นที่ 1/2/3' ในตัวโจทย์เด็ดขาด)]\n"
-                f"  เงื่อนไขฐาน (กำหนดค่า k): {base.params_description_th}\n"
-                f"  ความสัมพันธ์ซ้อน: พารามิเตอร์ m สัมพันธ์กับ k ตามสมการ m = |k| + {p_off}\n"
-                f"  เป้าหมายปลายทาง: ถามหาค่าของ m^2 + 2|k| + {q_add} "
-                f"(ผูกเงื่อนไขทั้งหมดเป็นประโยคภาษาไทยสละสลวยแบบ สสวท.; คำตอบสุดท้ายแน่นอน = {ans_str}, ความยาก 5 ดาว)"
-            )
-            return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=5)
+        if bridge == "func_eval" and is_int and abs(base_val) <= 35:
+            # Cross-chapter bridge: Evaluate quadratic/cubic function g(k) or g'(k)
+            a_c = rng.choice([2, 3])
+            b_c = rng.randint(1, 5)
+            c_c = rng.randint(4, 15)
+            val_expr = sp.simplify(a_c * (k_num**2) + b_c * k_num + c_c)
+            val_f = float(sp.N(val_expr))
+            if 0 <= val_f <= 9000:
+                ans_str = str(int(val_expr))
+                code = (
+                    f"{base.sympy_code}\n"
+                    f"_k1 = ANSWER\n"
+                    f"_kv = {k_sympy}\n"
+                    f"ANSWER = sp.simplify({a_c}*(_kv**2) + {b_c}*_kv + {c_c})\n"
+                    f"assert ANSWER >= 0"
+                )
+                desc = (
+                    f"[{lvl_tag} — บูรณาการข้ามบทกับฟังก์ชัน (ห้ามเขียนคำว่า 'ขั้นที่ 1/2' ในตัวโจทย์)]\n"
+                    f"  เงื่อนไขหลัก (หาค่า k): {base.params_description_th}\n"
+                    f"  เงื่อนไขเชื่อมโยง: กำหนดฟังก์ชัน $g(x) = {a_c}x^2 + {b_c}x + {c_c}$ "
+                    f"จงหาค่าของ $g({k_ref})$ (คำตอบสุดท้ายแน่นอน = {ans_str}, {stars} ดาว)"
+                )
+                return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=stars, archetype_id=base.archetype_id)
 
-    m_coef = rng.choice([4, 5])
-    stage3_expr = sp.simplify(m_coef * sp.Abs(base_expr) + p_off * q_add)
-    stage3_val = float(sp.N(stage3_expr))
-    if 0 <= stage3_val <= 9999.99 and abs(stage3_val * 100 - round(stage3_val * 100)) < 1e-4:
-        ans_str = str(int(stage3_expr)) if stage3_expr.is_integer else f"{stage3_val:.2f}".rstrip("0").rstrip(".")
-        code = (
-            f"{base.sympy_code}\n"
-            f"_k1 = sp.Abs(ANSWER)\n"
-            f"ANSWER = sp.simplify({m_coef}*_k1 + {p_off * q_add})\n"
-            f"assert ANSWER >= 0"
-        )
-        desc = (
-            f"[Level 3 — PAT1-Elite เชื่อมโยงเงื่อนไขซ้อนอย่างเนียนเป็นธรรมชาติ (ห้ามเขียนคำว่า 'ขั้นที่ 1/2/3' ในตัวโจทย์เด็ดขาด)]\n"
-            f"  เงื่อนไขฐาน (กำหนดค่า k): {base.params_description_th}\n"
-            f"  เป้าหมายปลายทาง: ถามหาค่าของ {m_coef}|k| + {p_off * q_add} "
-            f"(คำตอบสุดท้ายแน่นอน = {ans_str}, ความยาก 5 ดาว)"
-        )
-        return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=5)
+        if bridge == "linear_combo":
+            m_coef = rng.choice([2, 3, 4] if difficulty_level == 2 else [3, 4, 5])
+            c_add = rng.randint(5, 25 if difficulty_level == 2 else 45)
+            val_expr = sp.simplify(m_coef * k_num + c_add)
+            val_f = float(sp.N(val_expr))
+            if 0 <= val_f <= 9999.99 and abs(val_f * 100 - round(val_f * 100)) < 1e-4:
+                ans_str = str(int(val_expr)) if val_expr.is_integer else f"{val_f:.2f}".rstrip("0").rstrip(".")
+                code = (
+                    f"{base.sympy_code}\n"
+                    f"_k1 = ANSWER\n"
+                    f"ANSWER = sp.simplify({m_coef}*({k_sympy}) + {c_add})\n"
+                    f"assert ANSWER >= 0"
+                )
+                desc = (
+                    f"[{lvl_tag} — เชื่อมโยงเงื่อนไขต่อยอด (ห้ามเขียนคำว่า 'ขั้นที่ 1/2' ในตัวโจทย์)]\n"
+                    f"  เงื่อนไขหลัก (หาค่า k): {base.params_description_th}\n"
+                    f"  เป้าหมายปลายทาง: จงหาค่าของ ${m_coef}{k_ref} + {c_add}$ "
+                    f"(คำตอบสุดท้ายแน่นอน = {ans_str}, {stars} ดาว)"
+                )
+                return MathSeed(base.chapter_id, desc, ans_str, code, suggested_stars=stars, archetype_id=base.archetype_id)
+
     return base
 
 
@@ -606,13 +731,19 @@ def generate_verified_seed(
     chapter_id: str,
     seed: int | None = None,
     difficulty_level: int = 1,
+    exclude_archetypes: set[str] | None = None,
 ) -> MathSeed | None:
     """Return a SymPy-preverified parameter seed covering all 16 Syllabus 2560 chapters across Levels 1-3."""
     fn = _SEEDERS.get(chapter_id)
     if fn is None:
         return None
     rng = random.Random(seed)
-    base = fn(rng)
+    import inspect
+
+    if "exclude" in inspect.signature(fn).parameters:
+        base = fn(rng, exclude=exclude_archetypes)  # type: ignore[call-arg]
+    else:
+        base = fn(rng)
     return escalate_seed_for_level(base, difficulty_level=difficulty_level, rng=rng)
 
 
