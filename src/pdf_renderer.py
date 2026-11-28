@@ -163,9 +163,9 @@ def _base_head(title: str) -> str:
     size: A4;
     margin: 18mm 18mm 20mm 18mm;
     @top-right {{
-      content: "หน้า " counter(page) " / " counter(pages);
+      content: counter(page);
       font-family: 'Sarabun', 'TH Sarabun New', 'Tahoma', sans-serif;
-      font-size: 10pt;
+      font-size: 10.5pt;
       color: #444;
     }}
   }}
