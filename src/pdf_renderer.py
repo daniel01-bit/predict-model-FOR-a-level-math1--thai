@@ -7,11 +7,31 @@ import re
 import subprocess
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 
 DocType = Literal["exam", "solutions"]
+
+# Difficulty level accent colors matching the Web Dashboard (1=Olive, 2=Purple, 3=Crimson)
+DIFFICULTY_COLORS: dict[int, str] = {
+    1: "#556b2f",  # Level 1 — Olive Green (A-Level Standard)
+    2: "#7e22ce",  # Level 2 — Royal Purple (+50% Hard)
+    3: "#b91c1c",  # Level 3 — Crimson Red (+125% Nightmare)
+}
+
+
+def _difficulty_color(difficulty_level: int = 1) -> str:
+    """Return the hex color for the given difficulty tier (1, 2, or 3)."""
+    return DIFFICULTY_COLORS.get(int(difficulty_level), DIFFICULTY_COLORS[1])
+
+
+def _format_generated_timestamp(dt: datetime | None = None) -> str:
+    """Format generation timestamp as 'HH : MM / DD-MM-YY' (2-digit Thai BE year)."""
+    now = dt or datetime.now()
+    be_yy = (now.year + 543) % 100
+    return f"{now:%H} : {now:%M} / {now:%d}-{now:%m}-{be_yy:02d}"
 
 BROWSER_CANDIDATES = [
     Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
@@ -138,9 +158,16 @@ def _base_head(title: str) -> str:
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
   onload="renderMathInElement(document.body, {{delimiters:[{{left:'$$',right:'$$',display:true}},{{left:'$',right:'$',display:false}},{{left:'\\\\(',right:'\\\\)',display:false}},{{left:'\\\\[',right:'\\\\]',display:true}}], throwOnError:false}});"></script>
 <style>
+  /* A4 print layout with running page numbers at top-right corner */
   @page {{
     size: A4;
     margin: 18mm 18mm 20mm 18mm;
+    @top-right {{
+      content: "หน้า " counter(page) " / " counter(pages);
+      font-family: 'Sarabun', 'TH Sarabun New', 'Tahoma', sans-serif;
+      font-size: 10pt;
+      color: #444;
+    }}
   }}
   * {{ box-sizing: border-box; }}
   body {{
@@ -328,24 +355,34 @@ def _base_head(title: str) -> str:
 """
 
 
-def render_exam_html(items: list[dict], mode: str = "mock_test", target_year_be: int = 2570) -> str:
+def render_exam_html(
+    items: list[dict],
+    mode: str = "mock_test",
+    target_year_be: int = 2570,
+    difficulty_level: int = 1,
+    generated_at: str | None = None,
+) -> str:
+    """Build print-ready A4 HTML for the Exam Paper with cover page, difficulty-colored MOCK badge, and KaTeX."""
     meta = MODE_METADATA.get(mode, MODE_METADATA["mock_test"])
     mcq_items = [q for q in items if q["question_format"] == "mcq_5"]
     num_items = [q for q in items if q["question_format"] == "numeric"]
     total_pts = len(mcq_items) * 3 + len(num_items) * 5
+    diff_color = _difficulty_color(difficulty_level)
+    gen_time = generated_at or _format_generated_timestamp()
 
-    parts = [_base_head(f"A-Level 61 คณิตศาสตร์ประยุกต์ 1 ({meta['badge']})")]
+    parts = [_base_head(f"MOCK • คณิตศาสตร์ประยุกต์ 1 ({meta['badge']})")]
 
-    # Official A-Level 61 Cover Page
+    # Cover Page: generation timestamp, difficulty-colored MOCK box, Name-only student field, streamlined instructions
     parts.append(f"""
 <div class="cover-page">
   <div>
     <div class="cover-top">
       <div>
         <div style="font-weight:700; font-size:14pt;">แบบทดสอบจำลองมาตรฐาน A-Level (สสวท. หลักสูตร 2560)</div>
-        <div style="font-size:12pt; color:#333;">{html.escape(meta['title_th'])} • ปีการศึกษา {target_year_be}</div>
+        <div style="font-size:12pt; color:#333;">{html.escape(meta['title_th'])} • {html.escape(gen_time)}</div>
       </div>
-      <div class="subject-code">รหัสวิชา 61</div>
+      <!-- Cover top-right badge: MOCK colored by difficulty level (1=Olive, 2=Purple, 3=Crimson) -->
+      <div class="subject-code" style="color:{diff_color}; border-color:{diff_color}; letter-spacing:1.2px;">MOCK</div>
     </div>
 
     <div class="cover-title">
@@ -353,17 +390,14 @@ def render_exam_html(items: list[dict], mode: str = "mock_test", target_year_be:
       <p><strong>จำนวนข้อสอบ {len(items)} ข้อ</strong> &nbsp;|&nbsp; <strong>คะแนนเต็ม {total_pts} คะแนน</strong> &nbsp;|&nbsp; <strong>เวลาสอบ {meta['duration_min']} นาที</strong></p>
     </div>
 
+    <!-- Student info box: keep Name-Surname field only -->
     <div class="student-box">
       <div class="student-row">
         <div class="field-line"><strong>ชื่อ – นามสกุล:</strong></div>
-        <div class="field-line" style="max-width:40%;"><strong>เลขที่นั่งสอบ:</strong></div>
-      </div>
-      <div class="student-row">
-        <div class="field-line"><strong>สถานที่สอบ:</strong></div>
-        <div class="field-line" style="max-width:35%;"><strong>ห้องสอบ:</strong></div>
       </div>
     </div>
 
+    <!-- Exam instructions (2B pencil bubble instruction removed) -->
     <div class="instructions">
       <h3>คำชี้แจง</h3>
       <ol>
@@ -374,22 +408,22 @@ def render_exam_html(items: list[dict], mode: str = "mock_test", target_year_be:
           </ul>
         </li>
         <li>แต่ละข้อระบุระดับความยาก <strong>1–5 ดาว (★☆☆☆☆ ถึง ★★★★★)</strong> ตามความซับซ้อนของโจทย์และทักษะที่วัด</li>
-        <li>ใช้ดินสอดำเบอร์ 2B ระบายวงกลมคำตอบให้เต็มวง หากต้องการแก้ไขให้ลบด้วยยางลบให้สะอาด</li>
         <li>พื้นที่ว่างในเล่มแบบทดสอบสามารถใช้เป็นกระดาษทดได้ และรูปประกอบในข้อสอบอาจไม่ได้เขียนตามมาตราส่วนจริง</li>
         <li>ทุกข้อในชุดนี้ผ่านการตรวจสอบความถูกต้องเชิงสัญลักษณ์ด้วยระบบ <strong>SymPy Verification Gate</strong></li>
       </ol>
     </div>
   </div>
   <div class="cover-footer">
-    ห้ามเปิดแบบทดสอบจนกว่าจะได้รับอนุญาต &nbsp;•&nbsp; รหัสวิชา 61 คณิตศาสตร์ประยุกต์ 1
+    ห้ามเปิดแบบทดสอบจนกว่าจะได้รับอนุญาต &nbsp;•&nbsp; <span style="color:{diff_color};">MOCK</span> คณิตศาสตร์ประยุกต์ 1
   </div>
 </div>
 """)
 
+    # Running header on question pages: replace Academic Year with difficulty-colored MOCK
     parts.append(
         f'<div class="running-header">'
-        f'<span>รหัสวิชา 61 คณิตศาสตร์ประยุกต์ 1 ({html.escape(meta["badge"])})</span>'
-        f'<span>ปีการศึกษา {target_year_be}</span>'
+        f'<span>คณิตศาสตร์ประยุกต์ 1 ({html.escape(meta["badge"])}) • {html.escape(gen_time)}</span>'
+        f'<span style="color:{diff_color}; font-weight:700; letter-spacing:0.8px;">MOCK</span>'
         f'</div>'
     )
 
@@ -438,14 +472,24 @@ def render_exam_html(items: list[dict], mode: str = "mock_test", target_year_be:
     return "".join(parts)
 
 
-def render_solutions_html(items: list[dict], mode: str = "mock_test", target_year_be: int = 2570) -> str:
+def render_solutions_html(
+    items: list[dict],
+    mode: str = "mock_test",
+    target_year_be: int = 2570,
+    difficulty_level: int = 1,
+    generated_at: str | None = None,
+) -> str:
+    """Build print-ready A4 HTML for Solutions & Answer Key matching the Exam Paper MOCK format."""
     meta = MODE_METADATA.get(mode, MODE_METADATA["mock_test"])
-    parts = [_base_head(f"เฉลยละเอียด A-Level 61 ({meta['badge']})")]
+    diff_color = _difficulty_color(difficulty_level)
+    gen_time = generated_at or _format_generated_timestamp()
+    parts = [_base_head(f"เฉลยละเอียด MOCK ({meta['badge']})")]
 
+    # Solutions header adapted to match Exam Paper: generation timestamp + difficulty-colored MOCK badge
     parts.append(
         f'<div class="running-header">'
-        f'<span>เฉลยละเอียดและจุดหลอก • รหัสวิชา 61 คณิตศาสตร์ประยุกต์ 1</span>'
-        f'<span>{html.escape(meta["badge"])} • ปี {target_year_be}</span>'
+        f'<span>เฉลยละเอียดและจุดหลอก • คณิตศาสตร์ประยุกต์ 1 ({html.escape(meta["badge"])}) • {html.escape(gen_time)}</span>'
+        f'<span style="color:{diff_color}; font-weight:700; letter-spacing:0.8px;">MOCK</span>'
         f'</div>'
     )
 
@@ -550,11 +594,25 @@ def render_exam_bundle(
     mode: str,
     target_year_be: int,
     out_dir: Path,
+    difficulty_level: int = 1,
 ) -> dict[str, Path]:
-    """Generate both Exam Paper PDF and Answer Key PDF (plus HTML previews) in out_dir."""
+    """Generate both Exam Paper PDF and Answer Key PDF (plus HTML previews) in out_dir using a shared timestamp."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    exam_html = render_exam_html(items, mode=mode, target_year_be=target_year_be)
-    sol_html = render_solutions_html(items, mode=mode, target_year_be=target_year_be)
+    gen_time = _format_generated_timestamp()
+    exam_html = render_exam_html(
+        items,
+        mode=mode,
+        target_year_be=target_year_be,
+        difficulty_level=difficulty_level,
+        generated_at=gen_time,
+    )
+    sol_html = render_solutions_html(
+        items,
+        mode=mode,
+        target_year_be=target_year_be,
+        difficulty_level=difficulty_level,
+        generated_at=gen_time,
+    )
 
     exam_html_path = out_dir / "exam.html"
     sol_html_path = out_dir / "solutions.html"

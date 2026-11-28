@@ -66,7 +66,9 @@ def test_render_authentic_alevel_61_pdf_bundle(tmp_path: Path):
             "key_trap": "แทนค่า $x=3$ ลงใน $f(x)$ แทน $f'(x)$",
         },
     ]
-    bundle = render_exam_bundle(sample_items, mode="mini_test", target_year_be=2570, out_dir=tmp_path)
+    bundle = render_exam_bundle(
+        sample_items, mode="mini_test", target_year_be=2570, out_dir=tmp_path, difficulty_level=2
+    )
 
     for key in ("exam_pdf", "solutions_pdf"):
         pdf_path = bundle[key]
@@ -76,7 +78,14 @@ def test_render_authentic_alevel_61_pdf_bundle(tmp_path: Path):
         assert len(raw) > 5000
 
     exam_html = bundle["exam_html"].read_text(encoding="utf-8")
-    assert "รหัสวิชา 61" in exam_html
+    sol_html = bundle["solutions_html"].read_text(encoding="utf-8")
+    assert "MOCK" in exam_html and "MOCK" in sol_html
+    assert "#7e22ce" in exam_html and "#7e22ce" in sol_html  # Level 2 Purple MOCK color
+    assert "@top-right" in exam_html and "counter(page)" in exam_html
+    assert "ปีการศึกษา" not in exam_html and "ปี 2570" not in sol_html
+    assert "ดินสอดำเบอร์ 2B" not in exam_html
+    assert "ชื่อ – นามสกุล:" in exam_html
+    assert "เลขที่นั่งสอบ:" not in exam_html and "สถานที่สอบ:" not in exam_html and "ห้องสอบ:" not in exam_html
     assert "★★★★☆" in exam_html
     assert "★★★★★" in exam_html
 

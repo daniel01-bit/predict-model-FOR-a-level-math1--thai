@@ -267,6 +267,7 @@ def _run_generation_job(job: JobState) -> None:
                 mode=job.mode,
                 target_year_be=job.target_year_be,
                 out_dir=out_dir,
+                difficulty_level=job.difficulty_level,
             )
             if job.cancel_event.is_set():
                 raise JobCancelledError("Job cancelled during PDF render")
