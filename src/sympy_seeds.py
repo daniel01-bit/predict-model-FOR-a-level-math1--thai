@@ -83,7 +83,7 @@ def _seed_logic(rng: random.Random) -> MathSeed:
         f"กำหนดให้ประพจน์ $p, q, r$ มีค่าความจริงเป็น {p_th}, {q_th}, {r_th} ตามลำดับ "
         f"พิจารณาข้อความ 4 ข้อต่อไปนี้: (ก) $p \\rightarrow q$, (ข) $p \\land \\sim r$, "
         f"(ค) $q \\leftrightarrow r$, (ง) $(p \\lor q) \\rightarrow r$ "
-        f"-> ถามว่ามีข้อความที่มีค่าความจริงเป็น 'จริง' กี่ข้อ (ใช้ตัวเลือก 0, 1, 2, 3, 4 เท่านั้น; คำตอบแน่นอน = {ans})"
+        f"-> ถามว่ามีข้อความที่มีค่าความจริงเป็น “จริง” กี่ข้อ (ใช้ตัวเลือก 0, 1, 2, 3, 4 เท่านั้น; คำตอบแน่นอน = {ans})"
     )
     return MathSeed("logic", desc, str(ans), code, suggested_stars=2)
 

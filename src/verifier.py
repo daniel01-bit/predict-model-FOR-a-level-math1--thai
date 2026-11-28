@@ -453,8 +453,60 @@ def _has_repetition_loop(text: str) -> str | None:
     return None
 
 
+# LaTeX text-mode macros that LLMs/converters leak outside $...$ math mode (where KaTeX ignores them)
+_PROSE_LATEX_SYMBOL_MAP: tuple[tuple[str, str], ...] = (
+    (r"\\textquotesingle(?:\{\}|\s+)?", "'"),
+    (r"\\textquotedbl(?:\{\}|\s+)?", '"'),
+    (r"\\textquoteleft(?:\{\}|\s+)?", "‘"),
+    (r"\\textquoteright(?:\{\}|\s+)?", "’"),
+    (r"\\textquotedblleft(?:\{\}|\s+)?", "“"),
+    (r"\\textquotedblright(?:\{\}|\s+)?", "”"),
+    (r"\\textendash(?:\{\}|\s+)?", "–"),
+    (r"\\textemdash(?:\{\}|\s+)?", "—"),
+    (r"\\textellipsis(?:\{\}|\s+)?", "..."),
+    (r"\\textdegree(?:\{\}|\s+)?", "°"),
+    (r"\\textbaht(?:\{\}|\s+)?", "฿"),
+    (r"\\textperthousand(?:\{\}|\s+)?", "‰"),
+    (r"\\textbullet(?:\{\}|\s+)?", "•"),
+    (r"\\textasciitilde(?:\{\}|\s+)?", "~"),
+    (r"\\textasciicircum(?:\{\}|\s+)?", "^"),
+    (r"\\textbar(?:\{\}|\s+)?", "|"),
+    (r"\\textless(?:\{\}|\s+)?", "<"),
+    (r"\\textgreater(?:\{\}|\s+)?", ">"),
+    (r"\\textbackslash(?:\{\}|\s+)?", "/"),
+)
+
+
+def clean_prose_latex_leaks(text: str) -> str:
+    """Clean raw LaTeX text-mode macros & escaped punctuation ONLY outside $...$/$$...$$ math segments."""
+    if not text or "\\" not in text:
+        return text
+    parts = re.split(r"(\$\$[\s\S]*?\$\$|\$[^$]+\$)", text)
+    for i in range(0, len(parts), 2):
+        seg = parts[i]
+        if "\\" not in seg:
+            continue
+        for pat, repl in _PROSE_LATEX_SYMBOL_MAP:
+            seg = re.sub(pat, repl, seg)
+        # Unwrap prose-only LaTeX formatting wrappers like \textbf{...}, \textit{...}, \text{...}
+        for _ in range(3):
+            prev = seg
+            seg = re.sub(r"\\(?:textbf|textit|emph|textrm|text|underline|mathrm)\{([^{}]*)\}", r"\1", seg)
+            if seg == prev:
+                break
+        # Clean escaped punctuation & spacing commands outside math mode
+        seg = seg.replace(r"\%", "%").replace(r"\&", "&").replace(r"\#", "#").replace(r"\_", "_")
+        seg = re.sub(r"\\(?:newline|par)\b\s*", "\n", seg)
+        seg = re.sub(r"\\\\\s*", "\n", seg)
+        seg = re.sub(r"\\(?:qquad|quad)\b", " ", seg)
+        seg = re.sub(r"\\[,;:! ]", " ", seg)
+        seg = seg.replace(r"\ldots", "...").replace(r"\dots", "...")
+        parts[i] = seg
+    return "".join(parts)
+
+
 def sanitize_latex_text(text: str) -> str:
-    """Repair common JSON-eaten LaTeX control characters without corrupting \\neq, \\neg, \\notin, etc."""
+    """Repair common JSON-eaten LaTeX control characters and strip prose-mode backslash leaks."""
     if not text:
         return text
     text = text.replace("\t", r"\t").replace("\x0c", r"\f").replace("\x08", r"\b").replace("\r", r"\r")
@@ -468,6 +520,8 @@ def sanitize_latex_text(text: str) -> str:
     text = re.sub(r"(?:\\text\{)?\b(?:conj|conjugate)\b\}?\s*\(([^()]+)\)", r"\\overline{\1}", text)
     # Only convert literal \n when NOT followed by an ASCII letter (preserves \neq, \neg, \notin, \nu, \nabla)
     text = re.sub(r"\\n(?![a-zA-Z])", "\n", text)
+    # Clean raw LaTeX text-mode macros outside $...$ (e.g. \textquotesingle, \textbf, \%, \\)
+    text = clean_prose_latex_leaks(text)
     return text.strip()
 
 
@@ -564,8 +618,8 @@ class ALevelSymPyGate:
 
 def sanitize_choice_text(choice: str) -> str:
     """Clean accidental numbering prefixes like '1.) ', '1) ', '1. ', or '\\mathbf{1}\\text{.) }' from choices."""
-    cleaned = sanitize_latex_text(choice)
-    cleaned = re.sub(r"^\\mathbf\{\d+\}\\text\{\.?\)\s*\}\s*", "", cleaned)
+    cleaned = re.sub(r"^\s*\\mathbf\{\d+\}(?:\\text\{\.?\)\s*\}|\.?\)\s*)\s*", "", choice)
+    cleaned = sanitize_latex_text(cleaned)
     cleaned = re.sub(r"^\(?\d+\.?\)\s+", "", cleaned)
     cleaned = re.sub(r"^\d+\.\s+", "", cleaned)
     return cleaned.strip()
@@ -630,6 +684,8 @@ def check_latex_and_choice_quality(
             r"\bifa\b",
             r"\bifla\b",
             r"\\mathbf\{1\}",
+            r"\\textquote(?:single|dbl|left|right|dblleft|dblright)\b",
+            r"\\text(?:endash|emdash|ellipsis|degree|baht|bullet|backslash)\b",
         ):
             if re.search(bad_pat, txt):
                 return f"Garbled LaTeX/text token matched {bad_pat!r} in: {txt[:80]!r}"

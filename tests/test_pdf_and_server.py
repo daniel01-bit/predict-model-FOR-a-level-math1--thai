@@ -320,6 +320,16 @@ def test_special_math_and_logic_symbols_preserved_end_to_end():
     cx_seed = generate_verified_seed("complex_numbers", seed=42)
     assert cx_seed is not None and "conj(" not in cx_seed.params_description_th
 
+    # Verify prose-mode raw backslash leaks (\textquotesingle, \textbf, \%, \textdegree, \\) are stripped cleanly
+    leaked = r"มีค่าความจริงเป็น \textquotesingle จริง\textquotesingle{} \textbf{ทั้งหมด} 25\% อุณหภูมิ 30\textdegree{} และ $p \rightarrow q$ โดย $x \neq 0$"
+    fixed = sanitize_latex_text(leaked)
+    assert r"\textquotesingle" not in fixed
+    assert r"\textbf" not in fixed
+    assert r"\%" not in fixed
+    assert r"\textdegree" not in fixed
+    assert "'จริง'" in fixed and "ทั้งหมด" in fixed and "25%" in fixed and "30°" in fixed
+    assert r"$p \rightarrow q$" in fixed and r"$x \neq 0$" in fixed
+
 
 def test_quota_gauge_auto_resets_when_reset_window_expires():
     import time

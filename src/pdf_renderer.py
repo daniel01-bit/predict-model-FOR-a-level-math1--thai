@@ -140,7 +140,10 @@ def _auto_wrap_bare_latex(text: str, is_choice: bool = False) -> str:
 
 
 def _escape_keep_latex(text: str, is_choice: bool = False) -> str:
+    from src.verifier import clean_prose_latex_leaks
+
     cleaned = re.sub(r"(?:\\text\{)?\b(?:conj|conjugate)\b\}?\s*\(([^()]+)\)", r"\\overline{\1}", text)
+    cleaned = clean_prose_latex_leaks(cleaned)
     wrapped = _auto_wrap_bare_latex(cleaned, is_choice=is_choice)
     return html.escape(wrapped).replace("\n", "<br>")
 
